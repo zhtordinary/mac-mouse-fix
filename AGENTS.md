@@ -9,11 +9,11 @@
    - MacBook Air 本地 checkout：`/Volumes/19821669854/移动扩展盘/Projects/mac-mouse-fix`
    - **Syncthing 绝对隔离**：两台 Mac 的 `Projects/_stignore.shared` 必须严格包含 `/mac-mouse-fix` 和 `/mac-mouse-fix/**`，严禁 Syncthing 隐式同步本目录，所有源码与产物一律通过 Git 传递。
 
-2. **双桌面应用产物与直接实体安装规范**：
-   - 本项目管理两个桌面客户端：
-     1. `Mac Mouse Fix.app`：负责滚轮平滑滚动与中键手势；
-     2. `WeTypeVoiceTrigger.app`：负责滚轮中键双击以 220ms 极速唤醒微信输入法语音录入。
-   - 编译产物统一存放在仓库内 `releases/*.app`（在 Git 中单独 commit 跟踪）。
+2. **桌面应用产物与直接实体安装规范**：
+   - 本项目统一管理桌面客户端：
+     - `Mac Mouse Fix.app`：负责滚轮平滑滚动、中键手势，并原生内置 **“微信语音输入”** 动作（支持在中键连按/双击时以 ~200ms 极速唤醒微信输入法语音录入，天然消除拖拽误触与底层抢键冲突）。
+     - （注：历史独立的 `WeTypeVoiceTrigger.app` 已彻底废弃并卸载，能力全面由 Mac Mouse Fix 接管）。
+   - 编译产物统一存放在仓库内 `releases/Mac Mouse Fix.app`（在 Git 中单独 commit 跟踪）。
    - **安装方式（铁律）**：系统 `/Applications/*.app` 采用**直接实体拷贝模式（Direct Copy Install）**，杜绝软链接（Symlink），以确保 macOS 辅助功能 TCC 权限持久稳定，且跨卷 Universal Control 与登录项不丢失。
 
 3. **双机对偶交付流程 (`./scripts/ai-deliver.sh`)**：

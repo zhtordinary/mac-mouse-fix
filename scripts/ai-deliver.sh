@@ -7,7 +7,7 @@ PROJECT_NAME="mac-mouse-fix"
 GITHUB_REPO="zhtordinary/mac-mouse-fix"
 ORIGIN_URL="git@github.com:${GITHUB_REPO}.git"
 TARGET_BRANCH="personal-use"
-TRACKED_APPS=("releases/Mac Mouse Fix.app" "releases/WeTypeVoiceTrigger.app")
+TRACKED_APPS=("releases/Mac Mouse Fix.app")
 
 MINI_REPO="/Users/zibuyu/Projects/mac-mouse-fix"
 AIR_REPO="/Volumes/19821669854/移动扩展盘/Projects/mac-mouse-fix"
@@ -153,15 +153,7 @@ execute_mini_build() {
   gitq merge --ff-only "origin/$TARGET_BRANCH"
 
   echo "==> [Mini] 构建与打包产物..."
-  # 构建 WeTypeVoiceTrigger
-  if [[ -f "$REPO_DIR/WeTypeVoiceTrigger/build.sh" ]]; then
-    bash "$REPO_DIR/WeTypeVoiceTrigger/build.sh"
-    # 同步至 releases
-    mkdir -p "$REPO_DIR/releases"
-    rsync -a "/Applications/WeTypeVoiceTrigger.app/" "$REPO_DIR/releases/WeTypeVoiceTrigger.app/"
-  fi
-
-  # 确保 Mac Mouse Fix 产物在 releases
+  # 构建 Mac Mouse Fix
   echo "==> [Mini] 构建 Mac Mouse Fix..."
   xcodebuild -scheme "App - Release" -configuration Release CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO build
   local built_app="/Users/zibuyu/Library/Developer/Xcode/DerivedData/Mouse_Fix-ceeisowaynrxaeadqybxtuyqkyck/Build/Products/Release/Mac Mouse Fix.app"

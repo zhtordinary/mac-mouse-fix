@@ -8,7 +8,13 @@ REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 echo "==> [setup-app] 正在安装 releases 应用到 /Applications (直接实体复制模式)..."
 
-APPS=("Mac Mouse Fix.app" "WeTypeVoiceTrigger.app")
+APPS=("Mac Mouse Fix.app")
+
+# 清理历史独立触发器（已原生并入 Mac Mouse Fix）
+if [[ -e "/Applications/WeTypeVoiceTrigger.app" ]]; then
+  printf '   - 清理已废弃独立应用: /Applications/WeTypeVoiceTrigger.app\n'
+  rm -rf "/Applications/WeTypeVoiceTrigger.app"
+fi
 
 for app_name in "${APPS[@]}"; do
   src="$REPO_DIR/releases/$app_name"
