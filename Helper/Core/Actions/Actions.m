@@ -174,6 +174,10 @@
             NSNumber *nOfClicks = actionDict[kMFActionDictKeyMouseButtonClicksVariantNumberOfClicks];
             [ModificationUtility postMouseButtonClicks:button.intValue nOfClicks:nOfClicks.intValue];
         
+        } else if ([actionType isEqualToString:kMFActionDictTypeWeTypeVoice]) {
+            
+            triggerWeTypeVoiceInput();
+            
         } else if ([actionType isEqualToString:kMFActionDictTypeAddModeFeedback]) {
             NSMutableDictionary *payload = ((NSMutableDictionary *)actionDict.mutableCopy);
             [payload removeObjectForKey:kMFActionDictKeyType];
@@ -257,6 +261,83 @@ static void postKeyboardShortcut(CGKeyCode keyCode, CGSModifierFlags modifierFla
     CFRelease(keyDown);
     CFRelease(keyUp);
     CFRelease(modEvent);
+}
+
+#pragma mark - WeType Voice Input
+
+static void triggerWeTypeVoiceInput(void) {
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^{
+        NSArray<NSRunningApplication *> *apps = [NSRunningApplication runningApplicationsWithBundleIdentifier:@"com.apple.TextInputMenuAgent"];
+        NSRunningApplication *app = apps.firstObject;
+        if (!app) {
+            DDLogInfo("WeType: TextInputMenuAgent not found");
+            return;
+        }
+        AXUIElementRef appEl = AXUIElementCreateApplication(app.processIdentifier);
+        if (!appEl) return;
+        
+        CFTypeRef childrenVal = NULL;
+        if (AXUIElementCopyAttributeValue(appEl, kAXChildrenAttribute, &childrenVal) != kAXErrorSuccess || !childrenVal) {
+            CFRelease(appEl);
+            DDLogInfo("WeType: failed to copy children of TextInputMenuAgent");
+            return;
+        }
+        NSArray *mbs = (__bridge_transfer NSArray *)childrenVal;
+        if (mbs.count < 2) {
+            CFRelease(appEl);
+            DDLogInfo("WeType: menu bar count < 2");
+            return;
+        }
+        AXUIElementRef mb2 = (__bridge AXUIElementRef)mbs[1];
+        
+        CFTypeRef itemsVal = NULL;
+        if (AXUIElementCopyAttributeValue(mb2, kAXChildrenAttribute, &itemsVal) != kAXErrorSuccess || !itemsVal) {
+            CFRelease(appEl);
+            DDLogInfo("WeType: failed to copy menu bar items");
+            return;
+        }
+        NSArray *items = (__bridge_transfer NSArray *)itemsVal;
+        if (items.count == 0) {
+            CFRelease(appEl);
+            DDLogInfo("WeType: statusItem items empty");
+            return;
+        }
+        AXUIElementRef statusItem = (__bridge AXUIElementRef)items.firstObject;
+        
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0), ^{
+            AXUIElementPerformAction(statusItem, kAXPressAction);
+        });
+        
+        for (int attempt = 0; attempt < 40; attempt++) {
+            usleep(15000); // 15ms
+            CFTypeRef menuVal = NULL;
+            if (AXUIElementCopyAttributeValue(statusItem, kAXChildrenAttribute, &menuVal) == kAXErrorSuccess && menuVal) {
+                NSArray *menus = (__bridge_transfer NSArray *)menuVal;
+                if (menus.count > 0) {
+                    AXUIElementRef menu = (__bridge AXUIElementRef)menus.firstObject;
+                    CFTypeRef misVal = NULL;
+                    if (AXUIElementCopyAttributeValue(menu, kAXChildrenAttribute, &misVal) == kAXErrorSuccess && misVal) {
+                        NSArray *mis = (__bridge_transfer NSArray *)misVal;
+                        for (id miObj in mis) {
+                            AXUIElementRef mi = (__bridge AXUIElementRef)miObj;
+                            CFTypeRef titleVal = NULL;
+                            if (AXUIElementCopyAttributeValue(mi, kAXTitleAttribute, &titleVal) == kAXErrorSuccess && titleVal) {
+                                NSString *title = (__bridge_transfer NSString *)titleVal;
+                                if ([title containsString:@"语音输入"]) {
+                                    AXUIElementPerformAction(mi, kAXPressAction);
+                                    DDLogInfo("WeType: Voice input triggered successfully (attempt %d)", attempt);
+                                    CFRelease(appEl);
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        CFRelease(appEl);
+        DDLogInfo("WeType: Timed out waiting for 语音输入");
+    });
 }
 
 @end

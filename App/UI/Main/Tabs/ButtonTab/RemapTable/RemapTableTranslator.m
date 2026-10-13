@@ -172,6 +172,13 @@ static NSArray *getOneShotEffectsTable(NSDictionary *rowDict) {
             }
         },
         @{
+            @"ui": MFLocalizedString(@"effect.wetype-voice", @""),
+            @"tool": MFLocalizedString(@"effect.wetype-voice.hint", @""),
+            @"dict": @{
+              kMFActionDictKeyType: kMFActionDictTypeWeTypeVoice,
+            }
+        },
+        @{
             @"ui": MFLocalizedString(@"effect.click.primary", @""),
             @"tool": MFLocalizedString(@"effect.click.primary.hint", @""),
             @"hideable": @YES,

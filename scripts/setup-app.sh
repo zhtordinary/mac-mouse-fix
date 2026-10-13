@@ -30,4 +30,10 @@ for app_name in "${APPS[@]}"; do
   printf '   - 状态: 已安装就绪\n'
 done
 
+if pgrep -f "Mac Mouse Fix Helper" >/dev/null 2>&1; then
+  printf '   - 重启运行中的 Mac Mouse Fix Helper...\n'
+  killall "Mac Mouse Fix Helper" 2>/dev/null || true
+  sleep 1
+fi
+
 echo "==> ✅ 全部应用已成功实体安装至 /Applications！"

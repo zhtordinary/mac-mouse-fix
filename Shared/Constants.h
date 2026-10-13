@@ -183,6 +183,7 @@ typedef NSString*                                                       MFString
 #define kMFActionDictTypeSystemDefinedEvent                             @"systemDefinedEvent"
 #define kMFActionDictTypeMouseButtonClicks                              @"mouseButton"
 #define kMFActionDictTypeAddModeFeedback                                @"addModeAction"
+#define kMFActionDictTypeWeTypeVoice                                    @"weTypeVoice"
 
 // Variant keys
 

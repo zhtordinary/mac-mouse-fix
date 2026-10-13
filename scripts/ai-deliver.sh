@@ -162,7 +162,13 @@ execute_mini_build() {
   fi
 
   # 确保 Mac Mouse Fix 产物在 releases
-  if [[ -d "/Applications/Mac Mouse Fix.app" ]]; then
+  echo "==> [Mini] 构建 Mac Mouse Fix..."
+  xcodebuild -scheme "App - Release" -configuration Release CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO build
+  local built_app="/Users/zibuyu/Library/Developer/Xcode/DerivedData/Mouse_Fix-ceeisowaynrxaeadqybxtuyqkyck/Build/Products/Release/Mac Mouse Fix.app"
+  if [[ -d "$built_app" ]]; then
+    mkdir -p "$REPO_DIR/releases"
+    rsync -a --delete "$built_app/" "$REPO_DIR/releases/Mac Mouse Fix.app/"
+  elif [[ -d "/Applications/Mac Mouse Fix.app" ]]; then
     rsync -a "/Applications/Mac Mouse Fix.app/" "$REPO_DIR/releases/Mac Mouse Fix.app/"
   fi
 

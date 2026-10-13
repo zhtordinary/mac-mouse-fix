@@ -17,16 +17,17 @@ func logDebug(_ msg: String) {
 
 final class WeTypeVoiceTrigger: NSObject {
     private var lastClickTime: TimeInterval = 0
+    private var lastClickLocation: CGPoint?
     private var isCoolingDown = false
     private let cooldownInterval: TimeInterval = 0.50
-    private let doubleClickThreshold: TimeInterval = 0.65
+    private let doubleClickThreshold: TimeInterval = 0.35
     
     private var checkTimer: Timer?
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
 
     func start() {
-        logDebug("WeTypeVoiceTrigger started.")
+        logDebug("WeTypeVoiceTrigger daemon started.")
         
         if AXIsProcessTrusted() {
             setupEventTap()
@@ -81,11 +82,21 @@ final class WeTypeVoiceTrigger: NSObject {
         guard button == 2 else { return }
         
         let now = Date().timeIntervalSince1970
+        let loc = event.location
         if isCoolingDown { return }
         
         let diff = now - lastClickTime
-        if diff >= 0.06 && diff <= doubleClickThreshold {
+        var isWithinDistance = false
+        if let lastLoc = lastClickLocation {
+            let dx = loc.x - lastLoc.x
+            let dy = loc.y - lastLoc.y
+            let dist = sqrt(dx * dx + dy * dy)
+            isWithinDistance = (dist <= 10.0)
+        }
+        
+        if diff >= 0.06 && diff <= doubleClickThreshold && isWithinDistance {
             lastClickTime = 0
+            lastClickLocation = nil
             isCoolingDown = true
             logDebug(">>> Middle double-click detected (diff=\(String(format: "%.3f", diff))s)! Triggering voice input...")
             DispatchQueue.global(qos: .userInteractive).async { [weak self] in
@@ -96,11 +107,12 @@ final class WeTypeVoiceTrigger: NSObject {
             }
         } else {
             lastClickTime = now
-            logDebug("Middle single-click registered")
+            lastClickLocation = loc
+            logDebug("Middle single-click registered at (\(loc.x), \(loc.y))")
         }
     }
     
-    private func triggerVoiceInput() {
+    func triggerVoiceInput(completion: (() -> Void)? = nil) {
         guard let app = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.TextInputMenuAgent").first else {
             logDebug("Error: TextInputMenuAgent not found")
             return
@@ -142,6 +154,7 @@ final class WeTypeVoiceTrigger: NSObject {
                             let tHit = CFAbsoluteTimeGetCurrent()
                             AXUIElementPerformAction(mi, kAXPressAction as CFString)
                             logDebug(">>> SUCCESS! Voice input triggered in \(String(format: "%.2f", (tHit - t0) * 1000))ms (attempt \(attempt))")
+                            completion?()
                             return
                         }
                     }
@@ -149,11 +162,26 @@ final class WeTypeVoiceTrigger: NSObject {
             }
         }
         logDebug("Warning: Poll timed out without finding 语音输入")
+        completion?()
     }
 }
 
+let args = CommandLine.arguments
 let app = NSApplication.shared
-app.setActivationPolicy(.accessory) // pure background accessory app, perfectly responsive
+app.setActivationPolicy(.accessory)
 let trigger = WeTypeVoiceTrigger()
-trigger.start()
-app.run() // Run native macOS event loop!
+
+if args.contains("--daemon") {
+    trigger.start()
+    app.run()
+} else {
+    // One-shot mode: trigger voice input once and exit
+    trigger.triggerVoiceInput {
+        exit(0)
+    }
+    // Safety timeout in case run loop needed
+    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+        exit(0)
+    }
+    app.run()
+}
