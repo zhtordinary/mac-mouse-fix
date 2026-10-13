@@ -672,8 +672,8 @@ static NSString *effectNameForRowDict(NSDictionary * _Nonnull rowDict) {
             NSInteger rowBaseDataModel = [RemapTableUtility baseDataModelIndexFromGroupedDataModelIndex:row withGroupedDataModel:self.groupedDataModel];
             
             self.dataModel[rowBaseDataModel][kMFRemapsKeyEffect] = newEffectDict;
+            [self.controller writeDataModelToConfig];
             [self.tableView reloadData];
-            [self.controller updateTableAndWriteToConfig:nil];
             
         } cancelHandler:^{
             

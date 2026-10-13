@@ -260,6 +260,7 @@ import Cocoa
     @objc static func add() {
         
         assert(Thread.isMainThread)
+        if License.personalUseBuild { return }
         
         if openInstance != nil { return }
         openInstance = LicenseSheetController()

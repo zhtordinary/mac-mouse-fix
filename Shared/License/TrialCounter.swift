@@ -56,6 +56,10 @@ import Cocoa
         
         /// Init super
         super.init()
+
+#if PERSONAL_USE
+        return
+#endif
         
         /// Real init
             
@@ -155,6 +159,10 @@ import Cocoa
     #if IS_HELPER
     @objc func handleUse() {
         assertRunLoop(licensingRunLoop())
+
+#if PERSONAL_USE
+        return
+#endif
 
         /// Log
         DDLogDebug("TrialCounter.handleUse() called. trialIsActive: \(trialIsActive) | hasBeenUsedToday: \(hasBeenUsedToday) | lastUseDate: \(TrialCounter.lastUseDate.map { String(describing: $0) } ?? "<nil>") | daysOfUse: \(TrialCounter.daysOfUse)")

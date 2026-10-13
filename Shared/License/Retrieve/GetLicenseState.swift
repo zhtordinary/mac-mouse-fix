@@ -13,6 +13,14 @@ import CryptoKit
 
     /// -> This class retrieves instances of the `MFLicenseState` dataclass
 
+#if PERSONAL_USE
+    private static let personalUseLicenseState = MFLicenseState(
+        isLicensed: true,
+        freshness: kMFValueFreshnessFallback,
+        licenseTypeInfo: MFLicenseTypeInfoForce()
+    )
+#endif
+
     #if IS_MAIN_APP
     static func get_Preliminary(_callingFunc: String = #function) -> MFLicenseState {
 
@@ -22,10 +30,14 @@ import CryptoKit
         ///         This could lead to UI weirdness if we end up in a situation where the preliminary cache access always says the app .isLicensed but the subsequent validated cache access always says that  .isLicensed == false. We are trying to avoid this by deleting the cache after the offline validation fails. [Feb 2025]
         ///         To avoid such UI weirdness, the goal should be to keep the result of `get_Preliminary()` in sync with `get()` as much as feasible.
 
+#if PERSONAL_USE
+        let result = self.personalUseLicenseState
+#else
         assertRunLoop(licensingRunLoop())
 
         let result = self.licenseStateFromCache(licenseKey: "", deviceUID: nil, enableOfflineValidation: false) ??
                      self.licenseStateFromFallback
+#endif
         
         DDLogInfo("GetLicenseState.get_Preliminary(): \(result)\ncaller: \(_callingFunc)")
         
@@ -35,6 +47,9 @@ import CryptoKit
 
     @LicensingActor public static func get(_callingFunc: String = #function) async -> MFLicenseState {
 
+#if PERSONAL_USE
+        return self.personalUseLicenseState
+#else
         /// This function determines the current licenseState of the application.
         ///     To do this, it checks the `licenseServer`, `cache`, `fallback` values, and `special conditions`
         ///
@@ -127,6 +142,7 @@ import CryptoKit
 
         /// Return result
         return result
+#endif
     }
 
     /// Server/cache/fallback/overrides interfaces
@@ -358,6 +374,9 @@ import CryptoKit
     @LicensingActor public static func licenseStateFromServer(key: String, incrementActivationCount: Bool, licenseConfig: MFLicenseConfig) async -> (licenseState: MFLicenseState?, error: NSError?) {
         assertRunLoop(licensingRunLoop())
 
+#if PERSONAL_USE
+        return (self.personalUseLicenseState, nil)
+#else
         /// This function tries to retrieve the MFLicenseState from the known licenseServers.
         ///     If we don't receive clear information from any of the licenseServers about whether the license is valid or not, we return `nil`
         ///
@@ -538,5 +557,6 @@ import CryptoKit
         
         /// Return
         return (result, resultError)
+#endif
     }
 }

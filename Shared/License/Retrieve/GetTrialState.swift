@@ -14,6 +14,9 @@
     @objc static func get(_ licenseConfig: MFLicenseConfig) -> MFTrialState {
         assertRunLoop(licensingRunLoop())
 
+#if PERSONAL_USE
+        return MFTrialState(daysOfUse: 0, daysOfUseUI: 0, trialDays: 0, trialIsActive: false)
+#else
         #if FORCE_EXPIRED
             let daysOfUse = licenseConfig.trialDays + 1
         #elseif FORCE_NOT_EXPIRED
@@ -34,6 +37,7 @@
         )
         
         return result
+#endif
     }
 
 }

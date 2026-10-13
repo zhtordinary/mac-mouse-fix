@@ -99,6 +99,7 @@ class TrialNotificationController: NSWindowController {
         /// Validate
         
         assert(Thread.isMainThread)
+        if License.personalUseBuild { return }
         
         /// Unwrap window
         

@@ -47,7 +47,9 @@
 }
 
 - (IBAction)buyMMF:(id)sender {
-    
+
+    if ([License personalUseBuild]) { return; }
+
     [GetLicenseConfig getWith_callingFunc:NSStringFromSelector(_cmd) completionHandler:^(MFLicenseConfig * _Nonnull licenseConfig) {
             
         NSLocale *locale = NSLocale.currentLocale;

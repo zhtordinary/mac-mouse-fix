@@ -19,6 +19,7 @@
 /// - `FORCE_EXPIRED` Makes all the trial days be used up
 /// - `FORCE_NOT_EXPIRED` Makes the trial days be __not__ used up
 /// - `FORCE_LICENSED` Makes the app accept any license key.
+/// - `PERSONAL_USE` enables the local personal-use build policy.
 /// Note: It seems you need to __clean the build folder__ after changing the flags for them to take effect. (Under Ventura Beta)
 
 /// # __ Problems with the current architecture__ surrounding License.swift
@@ -76,11 +77,22 @@ extension MFTrialState:     @unchecked Sendable {}
 
 @objc class License: NSObject {
 
+    @objc static var personalUseBuild: Bool {
+#if PERSONAL_USE
+        return true
+#else
+        return false
+#endif
+    }
+
     // MARK: Lvl 3
 
     #if IS_HELPER
     @objc static func checkAndReact(triggeredByUser: Bool) {
 
+#if PERSONAL_USE
+        return
+#else
         /// This runs a check and then if necessary it:
         /// - ... shows some feedback about the licensing state to the user
         /// - ... locks down the helper
@@ -136,6 +148,7 @@ extension MFTrialState:     @unchecked Sendable {}
                 }
             }
         })
+#endif
     }
     #endif
 

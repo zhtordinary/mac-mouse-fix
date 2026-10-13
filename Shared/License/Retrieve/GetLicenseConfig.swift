@@ -17,6 +17,11 @@
     
     /// Main interface
     @LicensingActor @objc static func get(_callingFunc: String = #function) async -> MFLicenseConfig {
+#if PERSONAL_USE
+        let result = licenseConfigFallback()
+        DDLogInfo("GetLicenseConfig.get(): personal-use fallback\ncaller: \(_callingFunc)")
+        return result
+#else
         assertRunLoop(licensingRunLoop())
 
         /// Remember:
@@ -28,6 +33,7 @@
         DDLogInfo("GetLicenseConfig.get(): \(result)\ncaller: \(_callingFunc)")
         
         return result
+#endif
     }
 
     #if IS_MAIN_APP

@@ -40,7 +40,11 @@ import Foundation
             case is MFLicenseTypeInfoFreeCountry:
                 message = MFLocalizedString("license-toast.free-country", comment: "")
             case is MFLicenseTypeInfoForce:
+#if PERSONAL_USE
+                message = "Personal-use build"
+#else
                 message = "FORCE_LICENSED flag is active"
+#endif
             default: /// Default case: I think this can only happen if we forget to update this switch-statement after adding a new override.
                 assert(false)
                 DDLogError("Mac Mouse Fix appears to be licensed due to an override, but the specific override is not known:\n\(override)")

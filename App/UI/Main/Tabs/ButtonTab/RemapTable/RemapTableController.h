@@ -26,6 +26,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)addRowWithHelperPayload:(NSDictionary *)payload;
 - (IBAction)handleKeystrokeMenuItemSelected:(id)sender;
 - (IBAction)updateTableAndWriteToConfig:(id _Nullable)sender;
+- (void)writeDataModelToConfig;
 
 ///
 /// Interation with `ButtonTabController`

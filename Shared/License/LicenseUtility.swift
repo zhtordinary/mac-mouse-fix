@@ -56,7 +56,9 @@ func MFCatch<R, E>(_ workload: () async throws(E) -> R) async -> (R?, E?) {
 @objc class LicenseUtility: NSObject { /// [Sep 2026] Omitting `assertRunLoop(licensingRunLoop())` annotations since all functions in here are pure.
     
     @objc static func buyMMF(licenseConfig: MFLicenseConfig, locale: Locale, useQuickLink: Bool) {
-        
+#if PERSONAL_USE
+        return
+#else
         /// Originally implemented this in ObjC but lead to weird linker errors
         
         /// Check if altPayLink country
@@ -95,6 +97,7 @@ func MFCatch<R, E>(_ workload: () async throws(E) -> R) async -> (R?, E?) {
             /// Open URL
             NSWorkspace.shared.open(url)
         }
+#endif
     }
     
     @objc static func trialCounterString(licenseConfig: MFLicenseConfig, trialState: MFTrialState) -> NSAttributedString {

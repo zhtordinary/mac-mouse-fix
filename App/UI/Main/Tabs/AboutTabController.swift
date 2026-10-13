@@ -255,7 +255,11 @@ class AboutTabController: NSViewController {
             case is MFLicenseTypeInfoForce:
             
                 /// Case: Force
+#if PERSONAL_USE
+                message = "Personal-use build"
+#else
                 message = "The app will appear to be licensed due to the FORCE_LICENSED flag"
+#endif
             
             default:
             

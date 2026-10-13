@@ -340,6 +340,12 @@ static NSAttributedString *getStringForSystemDefinedEventOrSymbolicHotkey(int ty
 
     // Some key codes don't have an equivalent
     switch (vk) {
+        case kVK_Control:
+        case kVK_RightControl: return @"⌃";
+        case kVK_Option:
+        case kVK_RightOption: return @"⌥";
+        case kVK_Command:
+        case kVK_RightCommand: return @"⌘";
         case kVK_F1: return @"F1";
         case kVK_F2: return @"F2";
         case kVK_F3: return @"F3";

@@ -9,6 +9,7 @@
 
 #import "KeyCaptureMode.h"
 #import <Cocoa/Cocoa.h>
+#import <Carbon/Carbon.h>
 #import "ModificationUtility.h"
 #import "MFMessagePort.h"
 #import "Logging.h"
@@ -23,6 +24,37 @@
 
 
 CFMachPortRef _keyCaptureEventTap;
+CGKeyCode _pendingStandaloneModifierKeyCode = USHRT_MAX;
+
+static BOOL keyCaptureModeIsStandaloneModifierKeyCode(CGKeyCode keyCode) {
+    switch (keyCode) {
+        case kVK_Control:
+        case kVK_RightControl:
+        case kVK_Option:
+        case kVK_RightOption:
+        case kVK_Command:
+        case kVK_RightCommand:
+            return YES;
+        default:
+            return NO;
+    }
+}
+
+static BOOL keyCaptureModeModifierIsDown(CGKeyCode keyCode, CGEventFlags flags) {
+    switch (keyCode) {
+        case kVK_Control:
+        case kVK_RightControl:
+            return (flags & kCGEventFlagMaskControl) != 0;
+        case kVK_Option:
+        case kVK_RightOption:
+            return (flags & kCGEventFlagMaskAlternate) != 0;
+        case kVK_Command:
+        case kVK_RightCommand:
+            return (flags & kCGEventFlagMaskCommand) != 0;
+        default:
+            return NO;
+    }
+}
 
 + (void)enable {
     assertRunLoop(GlobalEventTapThread.runLoop);
@@ -33,18 +65,20 @@ CFMachPortRef _keyCaptureEventTap;
         _keyCaptureEventTap = [
             ModificationUtility
             createEventTapWithLocation: kCGHIDEventTap
-            mask: CGEventMaskBit(kCGEventKeyDown) | CGEventMaskBit(NSEventTypeSystemDefined)
+            mask: CGEventMaskBit(kCGEventKeyDown) | CGEventMaskBit(kCGEventFlagsChanged) | CGEventMaskBit(NSEventTypeSystemDefined)
             option: kCGEventTapOptionDefault
             placement: kCGHeadInsertEventTap
             callback: keyCaptureModeCallback
             runLoop: GlobalEventTapThread.runLoop
         ];
     }
+    _pendingStandaloneModifierKeyCode = USHRT_MAX;
     CGEventTapEnable(_keyCaptureEventTap, true);
 }
 
 + (void)disable {
     assertRunLoop(GlobalEventTapThread.runLoop);
+    _pendingStandaloneModifierKeyCode = USHRT_MAX;
     CGEventTapEnable(_keyCaptureEventTap, false);
 }
 
@@ -58,6 +92,7 @@ CGEventRef _Nullable keyCaptureModeCallback(CGEventTapProxy proxy, CGEventType t
     if (type == kCGEventKeyDown) {
         
         CGKeyCode keyCode = CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode);
+        _pendingStandaloneModifierKeyCode = USHRT_MAX;
         
         if (keyCaptureModePayloadIsValidWithKeyCode(keyCode, flags)) {
             
@@ -69,7 +104,24 @@ CGEventRef _Nullable keyCaptureModeCallback(CGEventTapProxy proxy, CGEventType t
             [MFMessagePort sendMessage: @"keyCaptureModeFeedback" withPayload: payload waitForReply: NO];
             [KeyCaptureMode disable];
         }
+
+    } else if (type == kCGEventFlagsChanged) {
         
+        CGKeyCode keyCode = CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode);
+        if (keyCaptureModeIsStandaloneModifierKeyCode(keyCode)) {
+            if (keyCaptureModeModifierIsDown(keyCode, flags)) {
+                _pendingStandaloneModifierKeyCode = keyCode;
+            } else if (_pendingStandaloneModifierKeyCode == keyCode) {
+                payload = @{
+                    @"keyCode": @(keyCode),
+                    @"flags": @(0),
+                };
+                [MFMessagePort sendMessage: @"keyCaptureModeFeedback" withPayload: payload waitForReply: NO];
+                _pendingStandaloneModifierKeyCode = USHRT_MAX;
+                [KeyCaptureMode disable];
+            }
+        }
+
     } else if (type == NSEventTypeSystemDefined) {
         
         NSEvent *e = [NSEvent eventWithCGEvent:event];
