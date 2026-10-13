@@ -54,12 +54,12 @@ class ResizingTabWindowController: NSWindowController, NSWindowDelegate {
     // MARK: Accessibility view
     
     func windowDidBecomeMain(_ notification: Notification) {
-        let accessibilityEnabled = (MFMessagePort.sendMessage("checkAccessibility", withPayload: nil, waitForReply: true) as? NSNumber)?.boolValue ?? true
-        
-        if accessibilityEnabled {
-            AuthorizeAccessibilityView.remove()
-        } else {
-            AuthorizeAccessibilityView.add()
+        if let accessibilityEnabled = (MFMessagePort.sendMessage("checkAccessibility", withPayload: nil, waitForReply: true) as? NSNumber)?.boolValue {
+            if accessibilityEnabled {
+                AuthorizeAccessibilityView.remove()
+            } else {
+                AuthorizeAccessibilityView.add()
+            }
         }
     }
 

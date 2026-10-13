@@ -89,9 +89,14 @@ class GeneralTabController: NSViewController {
             
             if doEnable {
                 
+                /// Immediately probe accessibility so that if permissions are missing,
+                /// the authorization sheet appears on the very first click without delay
+                self.checkAccessibilityOnEnable()
+                
                 let userClickTS = CACurrentMediaTime()
                 
                 EnabledState.shared.enable(onComplete: { error in
+                    self.checkAccessibilityOnEnable()
                     
                     if error == nil {
                         
@@ -282,6 +287,21 @@ class GeneralTabController: NSViewController {
             SparkleUpdaterController.enablePrereleaseChannel(doCheckBetas)
             if doCheckBetas {
                 SUUpdater.shared().checkForUpdatesInBackground()
+            }
+        }
+    }
+    
+    private func checkAccessibilityOnEnable(retries: Int = 10) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [weak self] in
+            let response = (MFMessagePort.sendMessage("checkAccessibility", withPayload: nil, waitForReply: true) as? NSNumber)?.boolValue
+            if let hasAccessibility = response {
+                if !hasAccessibility {
+                    AuthorizeAccessibilityView.add()
+                } else {
+                    AuthorizeAccessibilityView.remove()
+                }
+            } else if retries > 0 {
+                self?.checkAccessibilityOnEnable(retries: retries - 1)
             }
         }
     }
