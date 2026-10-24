@@ -21,13 +21,24 @@
      ```bash
      ./scripts/ai-deliver.sh --message '<type>: <describe change>' --files <changed-files>...
      ```
-   - 脚本自动识别当前设备：
-     - 若在 Mini 发起：本地提交源码 → Mini 本地构建/更新 releases → 直接复制到 Mini `/Applications/` → push GitHub → SSH 触发 Air fast-forward pull 并自动安装至 Air `/Applications/`。
-     - 若在 Air 发起：本地提交源码 → push GitHub → SSH 触发 Mini 远程构建产物并 push → Air 本地 fast-forward pull 并自动安装。
-   - 纯文档、规则或脚本改动（`.md`, `scripts/*`）自动跳过构建。
+   - 源码先独立提交并推送 GitHub，再按变更路径执行交付：
+     - 纯文档、规则或工作流脚本改动（`.md`, `scripts/*`, `docs/*`）：两端仅通过 GitHub fast-forward 对齐；跳过构建、产物提交、安装、签名和 App/Helper 重启。
+     - 运行时改动：Mini 固定负责构建、实体安装及独立的 releases 产物提交；从 Air 发起时通过 SSH 调用 Mini 构建。产物经 GitHub 对齐后，在 Air 实体安装。
+   - 正常交付和 `--resume` 使用相同的路径分类；续交付根据已发布源码提交判断，不重复生成源码 commit。
+   - 对端同步前核对分支、remote、工作区干净及目标提交；离线、脏工作区或无法 fast-forward 时交付失败，保留现场并报告阻塞。
+   - 修改交付流程后运行 `python3 scripts/test_ai_deliver.py`，用隔离 Git/SSH/构建夹具验证文档双向交付、续交付及运行时分支。
 
 4. **安全与防劣化防护**：
    - **严禁覆盖个人版**：绝不执行 `brew upgrade mac-mouse-fix`，必须永久使用本地 `personal-use` 定制构建。
    - **严禁引入内核驱动劫持**：不使用 DriverKit / Karabiner 抓取鼠标，确保 Universal Control 跨屏鼠标漫游 100% 顺畅。
    - **源码与产物双 Commit**：源码修改与 releases app 产物必须拆分为两个独立 commit，严禁混合提交。
    - 发生中断时，使用 `./scripts/ai-deliver.sh --resume <source-sha>` 继续，绝不重复生成源码 commit。
+
+## 提交前与交付后核验
+
+- 接手时记录根层候选、Git 状态和 worktree 登记基线。提交/交付前，对主 checkout 执行 `python3 "$HOME/.agents/skills/github-repo-ops/scripts/scan-root-empty.py" "<本机主checkout绝对路径>"`；不同于主 checkout 的本任务工作树另扫根层。
+- 扫描只发现根目录直接子项中的物理空目录和零字节普通文件，不递归、不读取文件内容、不跟随符号链接；非空目录只检查首条目。隐藏和 ignored 对象同样列出；发现阶段不运行 Git、构建或全仓哈希。
+- 将完整 `candidates` 清单交给 AI 逐项判断用途、归属及是否误创建；不按名称、正则、命令名黑名单或是否新增过滤候选，也不凭名字或空状态删除。合法的零字节 `.gitkeep`、约定占位目录等说明用途后保留；存疑项保留并报告待确认信息。
+- 仅处理 AI 确认且在本任务授权范围内的错误产物。操作前重新确认路径身份、类型、空状态及无有效引用；有并发写入或类型变化时停止。普通空目录只用 `rmdir`，零字节普通文件使用废纸篓或项目已有可恢复方式；工作树用 Git 原生命令。保护 WIP、用户数据和符号链接，不用强删、prune、覆盖或新增 ignore 掩盖问题。
+- 清理后及交付脚本结束后重跑同一扫描，报告“已清理／合法保留／待确认”。扫描 `errors` 非空或非零退出时报告阻塞，不能把部分结果当完整检查；没有候选只表示这一层未发现目标空对象。
+- 原有 Git 与交付门禁照常执行：`git status --porcelain=v1 --untracked-files=all`、`git diff --check`、暂存区/显式文件清单及 `git worktree list --porcelain`。有副作用的命令先核对 cwd、argv 和精确路径，失败后先回读实际状态；既有验证、合入及发布授权不变。

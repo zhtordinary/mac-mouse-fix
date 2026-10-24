@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 多 Mac 协同 GitHub 交付脚本：Mac Mouse Fix + WeTypeVoiceTrigger
+# 多 Mac 协同 GitHub 交付脚本：Mac Mouse Fix
 # 架构：双 Mac 对偶发起 + 固定 Mac mini 构建 + tracked app 独立提交 + 直接实体复制安装(/Applications)
 set -Eeuo pipefail
 
@@ -24,7 +24,7 @@ Usage:
 说明：
   1. 无论在 Mac mini 还是 MacBook Air 均可直接发起。
   2. 源码提交与 releases 产物提交完全分离。
-  3. 文档、规则、脚本等非运行时改动自动跳过构建。
+  3. 文档、规则、脚本等非运行时改动仅同步 Git，跳过构建、安装、签名与重启。
   4. 应用安装采用直接实体复制到 /Applications，杜绝软链接。
 USAGE
 }
@@ -104,7 +104,7 @@ assert_no_release_inputs() {
 }
 
 assert_only_paths() {
-  local expected_file actual_file tmp
+  local expected_file actual_file tmp status=0
   tmp="$(mktemp -d)"
   expected_file="$tmp/expected"
   actual_file="$tmp/actual"
@@ -118,10 +118,11 @@ assert_only_paths() {
   if ! cmp -s "$expected_file" "$actual_file"; then
     printf '%s\n' '指定的文件列表与当前工作树修改不符:' >&2
     diff -u "$expected_file" "$actual_file" >&2 || true
-    rm -rf -- "$tmp"
-    exit 2
+    status=2
   fi
-  rm -rf -- "$tmp"
+  rm -- "$expected_file" "$actual_file"
+  rmdir -- "$tmp"
+  return "$status"
 }
 
 paths_require_build() {
@@ -188,7 +189,16 @@ case "$MODE" in
     ;;
 
   resume)
-    [[ -n "$SOURCE_SHA" ]] || die '未提供 SOURCE_SHA'
+    [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || die 'SOURCE_SHA 无效'
+    assert_contract
+    [[ -z "$(gitq status --porcelain=v1 --untracked-files=all)" ]] || die '续交付要求工作区干净'
+    gitq fetch --quiet origin "$TARGET_BRANCH"
+    gitq merge-base --is-ancestor "$SOURCE_SHA" "origin/$TARGET_BRANCH" || die 'SOURCE_SHA 必须已发布到目标分支'
+    while IFS= read -r -d '' path; do
+      PATHS+=("$path")
+    done < <(gitq diff-tree --root --no-commit-id --name-only -r -z "$SOURCE_SHA")
+    [[ ${#PATHS[@]} -gt 0 ]] || die '源码提交没有变更路径'
+    assert_no_release_inputs
     ;;
 
   deliver)
@@ -210,7 +220,7 @@ esac
 
 # 检查是否需要触发构建
 NEEDS_BUILD=true
-if [[ "$MODE" == 'deliver' ]] && ! paths_require_build; then
+if ! paths_require_build; then
   NEEDS_BUILD=false
   echo "==> 本次均为文档/脚本修改，跳过构建。"
 fi
@@ -225,25 +235,53 @@ if [[ "$NEEDS_BUILD" == true ]]; then
   fi
 fi
 
-# 对端快速同步 (fast-forward pull + setup-app)
+# 两端以同一 GitHub 提交收口；仅运行时交付执行安装。
+[[ -z "$(gitq status --porcelain=v1 --untracked-files=all)" ]] || die '同步前工作区必须干净'
+gitq fetch --quiet origin "$TARGET_BRANCH"
+if [[ "$NEEDS_BUILD" == false ]]; then
+  [[ "$(gitq rev-parse "origin/$TARGET_BRANCH")" == "$SOURCE_SHA" ]] || die '远端已前进，请核对本次源码提交后续交付'
+fi
+gitq merge --ff-only "origin/$TARGET_BRANCH"
+FINAL_SHA="$(gitq rev-parse HEAD)"
+gitq merge-base --is-ancestor "$SOURCE_SHA" "$FINAL_SHA" || die '最终提交不包含本次源码提交'
+
 if [[ "$ROLE" == 'macmini' ]]; then
-  echo "==> 3. 同步至 MacBook Air..."
-  if ssh -o BatchMode=yes -o ConnectTimeout=3 "$AIR_HOST" "true" 2>/dev/null; then
-    ssh -o BatchMode=yes "$AIR_HOST" "
-      git -C '$AIR_REPO' fetch origin '$TARGET_BRANCH' && \
-      git -C '$AIR_REPO' merge --ff-only 'origin/$TARGET_BRANCH' && \
-      '$AIR_REPO/scripts/setup-app.sh'
-    "
-    echo "==> ✅ MacBook Air 已自动 fast-forward 对齐并完成实体安装！"
-  else
-    echo "==> ⚠️ MacBook Air 当前离线，待开机后拉取分支即可对齐。"
-  fi
+  OTHER_HOST=$AIR_HOST
+  OTHER_REPO=$AIR_REPO
+  INSTALL_OTHER=$NEEDS_BUILD
 else
-  echo "==> 3. MacBook Air 本地拉取最新产物..."
-  gitq fetch origin "$TARGET_BRANCH"
-  gitq merge --ff-only "origin/$TARGET_BRANCH"
-  install_local_apps
-  echo "==> ✅ MacBook Air 本地已对齐最新产物并完成实体安装！"
+  OTHER_HOST=$MINI_HOST
+  OTHER_REPO=$MINI_REPO
+  INSTALL_OTHER=false
 fi
 
-echo "==> 🎉 交付完成！Source SHA: $SOURCE_SHA"
+printf -v remote_command 'bash -s -- %q %q %q %q %q' "$OTHER_REPO" "$TARGET_BRANCH" "$ORIGIN_URL" "$FINAL_SHA" "$INSTALL_OTHER"
+echo "==> 3. 同步对端 $OTHER_HOST..."
+ssh -o BatchMode=yes -o ConnectTimeout=15 "$OTHER_HOST" "$remote_command" <<'REMOTE'
+set -Eeuo pipefail
+repo=$1
+branch=$2
+origin=$3
+target=$4
+install=$5
+[[ "$(git -C "$repo" branch --show-current)" == "$branch" ]] || { echo 'ERROR: 对端分支不符' >&2; exit 1; }
+[[ "$(git -C "$repo" remote get-url origin)" == "$origin" ]] || { echo 'ERROR: 对端 remote 不符' >&2; exit 1; }
+[[ -z "$(git -C "$repo" status --porcelain=v1 --untracked-files=all)" ]] || { echo 'ERROR: 对端存在未提交修改' >&2; exit 1; }
+git -C "$repo" fetch --quiet origin "$branch"
+[[ "$(git -C "$repo" rev-parse "origin/$branch")" == "$target" ]] || { echo 'ERROR: 远端已变化，请核对后续交付' >&2; exit 1; }
+git -C "$repo" merge --ff-only "$target"
+if [[ "$install" == true ]]; then
+  "$repo/scripts/setup-app.sh"
+fi
+[[ "$(git -C "$repo" rev-parse HEAD)" == "$target" && -z "$(git -C "$repo" status --porcelain=v1 --untracked-files=all)" ]] || { echo 'ERROR: 对端未收口' >&2; exit 1; }
+echo "PEER_HEAD=$target"
+REMOTE
+
+if [[ "$ROLE" == 'macbook-air' && "$NEEDS_BUILD" == true ]]; then
+  install_local_apps
+fi
+[[ "$(gitq rev-parse HEAD)" == "$FINAL_SHA" && -z "$(gitq status --porcelain=v1 --untracked-files=all)" ]] || die '本地未收口'
+if [[ "$NEEDS_BUILD" == false ]]; then
+  echo 'INSTALL=skipped (仅文档/工作流改动，未安装、签名或重启 App)'
+fi
+echo "==> 🎉 交付完成！Source SHA: $SOURCE_SHA Final SHA: $FINAL_SHA"
