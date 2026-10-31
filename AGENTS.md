@@ -28,7 +28,13 @@
    - 对端同步前核对分支、remote、工作区干净及目标提交；离线、脏工作区或无法 fast-forward 时交付失败，保留现场并报告阻塞。
    - 修改交付流程后运行 `python3 scripts/test_ai_deliver.py`，用隔离 Git/SSH/构建夹具验证文档双向交付、续交付及运行时分支。
 
-4. **安全与防劣化防护**：
+## 协作流程入口
+
+修改源码、规则、文档、测试或配置前，必须先阅读 [项目协作流程](docs/collaboration.md)。该流程按 `github-repo-ops 2026.11.01.1` 实例化，详细说明任务 worktree、personal-use 分支、验证、交付和收尾边界。
+
+当前仓库没有项目内 AOCI 资产、Guide、CLI 或 task-bound 服务；不得因为主机上存在其他项目的工具而创建 `.aoci/`、`aoci.txt` 等正式资产，或把当前 cwd 当成治理绑定证明。AOCI 的条件性使用和阻塞规则以 [项目协作流程](docs/collaboration.md) 为准。
+
+## 安全与防劣化防护
    - **严禁覆盖个人版**：绝不执行 `brew upgrade mac-mouse-fix`，必须永久使用本地 `personal-use` 定制构建。
    - **严禁引入内核驱动劫持**：不使用 DriverKit / Karabiner 抓取鼠标，确保 Universal Control 跨屏鼠标漫游 100% 顺畅。
    - **源码与产物双 Commit**：源码修改与 releases app 产物必须拆分为两个独立 commit，严禁混合提交。

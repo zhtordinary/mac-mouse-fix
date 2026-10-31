@@ -26,6 +26,9 @@ mmfscriptscache/
 # Carthage derived data
 # Carthage/
 
+# Agent-managed task worktrees; do not nest task copies in a checkout.
+/.worktrees/
+
 # White-listing xcschemes folder. (.gitignore whitelisting is a huge hassle but this works)
 # -> We don't need this anymore, because instead we just moved the build schemes to shared
 # !Mouse Fix.xcodeproj/xcuserdata/
