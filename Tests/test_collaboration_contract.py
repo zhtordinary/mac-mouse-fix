@@ -21,7 +21,8 @@ class CollaborationContractTests(unittest.TestCase):
         ignore = (ROOT / ".gitignore").read_text()
 
         self.assertIn("docs/collaboration.md", agents)
-        self.assertIn("github-repo-ops 2026.11.01.1", workflow)
+        self.assertIn("github-repo-ops 2026.11.03.3", agents)
+        self.assertIn("github-repo-ops 2026.11.03.3", workflow)
         self.assertIn("git@github.com:zhtordinary/mac-mouse-fix.git", workflow)
         self.assertIn("personal-use", workflow)
         self.assertIn("/.worktrees/", ignore)
@@ -29,6 +30,52 @@ class CollaborationContractTests(unittest.TestCase):
         self.assertIn('`--repo "$TASK"`', workflow)
         self.assertIn("runtime_repository_root", workflow)
         self.assertIn("不创建伪 index", workflow)
+
+    def test_future_governance_checks_actual_interfaces_and_each_candidate(self):
+        workflow = (ROOT / "docs/collaboration.md").read_text()
+        for requirement in (
+            "两种接口均使用时分别核验",
+            "不得假定 CLI 支持所有 MCP 操作",
+            "session cwd 与任务树是不同上下文，不要求相等",
+            "受管源码-only 候选即使正式资产未变也不能跳过治理",
+            "范围未知即阻塞",
+            "Verify、Check、实时 Guide",
+            "保留工具的 CAS 检查与用户数据保护",
+            "离线替身或静态文档不是实际治理证明",
+        ):
+            self.assertIn(requirement, workflow)
+
+    def test_delivery_defaults_are_git_only_and_app_is_explicit(self):
+        delivery = (ROOT / "scripts/ai-deliver.sh").read_text()
+        setup = (ROOT / "scripts/setup-app.sh").read_text()
+        for requirement in (
+            "独立任务 worktree",
+            "--with-app",
+            "--build-remote 必须同时提供真实 guard HANDOFF",
+            "--request-push-effects",
+            "assert_external_push_guard",
+            "AUTHORIZED_TREE",
+            "verify_candidate_tree",
+            "verify_artifact_candidate",
+            "GUARD_HANDOFF",
+            "PROJECT_GUARD=''",
+            "PUSH=blocked",
+            "PUSH=blocked",
+            "App 阶段未授权",
+            "assert_release_only_descendant",
+            "refs/heads/$TARGET_BRANCH",
+        ):
+            self.assertIn(requirement, delivery)
+        self.assertNotIn("paths_require_build", delivery)
+        self.assertIn("App 安装/重启必须显式提供 --with-app", setup)
+        workflow = (ROOT / "docs/collaboration.md").read_text()
+        self.assertIn("普通 Git push 不是纯本地 Git 操作", workflow)
+        self.assertIn("真实外部未决状态", workflow)
+        self.assertIn("当前项目没有已核验的真实副作用守卫", workflow)
+        self.assertIn("commit hook 插入额外文件", workflow)
+        self.assertIn("`setup-app.sh` 当前在任何文件或进程操作前无条件拒绝", workflow)
+        self.assertIn("不保存 commit", workflow)
+        self.assertIn("各自明确授权", workflow)
 
     def test_worktree_ignore_rule_is_active(self):
         result = subprocess.run(

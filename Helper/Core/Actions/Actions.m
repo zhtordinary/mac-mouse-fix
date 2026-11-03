@@ -26,6 +26,16 @@
 
 #import "Threads.h"
 #import "GlobalEventTapThread.h"
+#import "ActionPhaseDispatch.h"
+#import "KeyboardEventSafety.h"
+
+static void postStandaloneModifierKey(CGKeyCode keyCode, BOOL keyDown);
+static void postKeyboardShortcut(CGKeyCode keyCode, CGSModifierFlags modifierFlags);
+static void postKeyboardActionEvent(MFKeyboardActionEvent event);
+
+_Static_assert(kMFActionPhaseStart == MFKeyboardActionPhaseStart, "action phase start drifted");
+_Static_assert(kMFActionPhaseEnd == MFKeyboardActionPhaseEnd, "action phase end drifted");
+_Static_assert(kMFActionPhaseCombined == MFKeyboardActionPhaseCombined, "action phase combined drifted");
 
 @implementation Actions
 
@@ -35,7 +45,17 @@
     DDLogDebug("Executing action array: %@, phase: %@", actionArray, @(phase));
     
     if (phase == kMFActionPhaseEnd) {
-        return; /// TODO: Actually implement actions with different phases
+        for (NSDictionary *actionDict in actionArray) {
+            MFStringConstant actionType = actionDict[kMFActionDictKeyType];
+            if (![actionType isEqualToString:kMFActionDictTypeKeyboardShortcut]) {
+                continue;
+            }
+
+            NSNumber *keycode = actionDict[kMFActionDictKeyKeyboardShortcutVariantKeycode];
+            NSNumber *flags = actionDict[kMFActionDictKeyKeyboardShortcutVariantModifierFlags];
+            MFDispatchKeyboardAction(keycode.unsignedShortValue, flags.unsignedLongValue, phase, postKeyboardActionEvent);
+        }
+        return;
     }
                
     for (NSDictionary *actionDict in actionArray) {
@@ -159,7 +179,7 @@
             
             NSNumber *keycode = actionDict[kMFActionDictKeyKeyboardShortcutVariantKeycode];
             NSNumber *flags = actionDict[kMFActionDictKeyKeyboardShortcutVariantModifierFlags];
-            postKeyboardShortcut(keycode.intValue, flags.intValue);
+            MFDispatchKeyboardAction(keycode.unsignedShortValue, flags.unsignedLongValue, phase, postKeyboardActionEvent);
             
         } else if ([actionType isEqualToString:kMFActionDictTypeSystemDefinedEvent]) {
             
@@ -224,6 +244,49 @@ static void postSystemDefinedEvent(MFSystemDefinedEventType type, NSEventModifie
 
 #pragma mark - Keyboard shortcuts
 
+static void *createKeyboardEventForSafety(uint16_t keyCode, bool keyDown) {
+    return (void *)CGEventCreateKeyboardEvent(NULL, (CGKeyCode)keyCode, keyDown);
+}
+
+static void setKeyboardTypeForSafety(void *event, uint32_t keyboardType) {
+    CGEventSetIntegerValueField((CGEventRef)event, kCGKeyboardEventKeyboardType, keyboardType);
+}
+
+static void postKeyboardEventForSafety(void *event) {
+    CGEventPost(kCGSessionEventTap, (CGEventRef)event);
+}
+
+static void releaseKeyboardEventForSafety(void *event) {
+    CFRelease((CGEventRef)event);
+}
+
+static void postStandaloneModifierKey(CGKeyCode keyCode, BOOL keyDown) {
+    if (!MFPostKeyboardEventSafely(
+            keyCode,
+            keyDown,
+            MFKeyboardTypeCurrent(),
+            createKeyboardEventForSafety,
+            setKeyboardTypeForSafety,
+            postKeyboardEventForSafety,
+            releaseKeyboardEventForSafety)) {
+        DDLogError("postStandaloneModifierKey: failed to create keyboard event");
+    }
+}
+
+static void postKeyboardActionEvent(MFKeyboardActionEvent event) {
+    switch (event.kind) {
+        case MFKeyboardActionEventStandaloneDown:
+            postStandaloneModifierKey(event.keyCode, YES);
+            break;
+        case MFKeyboardActionEventStandaloneUp:
+            postStandaloneModifierKey(event.keyCode, NO);
+            break;
+        case MFKeyboardActionEventShortcut:
+            postKeyboardShortcut(event.keyCode, (CGSModifierFlags)event.modifierFlags);
+            break;
+    }
+}
+
 static void postKeyboardShortcut(CGKeyCode keyCode, CGSModifierFlags modifierFlags) {
     
     DDLogDebug("postKeyboardShortcut: Posting shortcut with %@", vardesc(keyCode, modifierFlags));
@@ -233,6 +296,12 @@ static void postKeyboardShortcut(CGKeyCode keyCode, CGSModifierFlags modifierFla
     /// Create key events
     CGEventRef keyUp = CGEventCreateKeyboardEvent(NULL, keyCode, false);
     CGEventRef keyDown = CGEventCreateKeyboardEvent(NULL, keyCode, true);
+    if (keyUp == NULL || keyDown == NULL) {
+        DDLogError("postKeyboardShortcut: failed to create keyboard event");
+        if (keyUp != NULL) CFRelease(keyUp);
+        if (keyDown != NULL) CFRelease(keyDown);
+        return;
+    }
     CGEventSetFlags(keyDown, (CGEventFlags)modifierFlags);
     CGEventSetFlags(keyUp, (CGEventFlags)modifierFlags);
     
@@ -251,6 +320,12 @@ static void postKeyboardShortcut(CGKeyCode keyCode, CGSModifierFlags modifierFla
     ///      (Sometimes triggered Siri instead)
 //    CGEventFlags originalModifierFlags = CGEventGetFlags(CGEventCreate(NULL));
     CGEventRef modEvent = CGEventCreate(NULL);
+    if (modEvent == NULL) {
+        DDLogError("postKeyboardShortcut: failed to create modifier restore event");
+        CFRelease(keyDown);
+        CFRelease(keyUp);
+        return;
+    }
 //    CGEventSetFlags(modEvent, originalModifierFlags);
     
     /// Send key events

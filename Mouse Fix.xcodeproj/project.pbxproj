@@ -391,6 +391,8 @@
 		4FF7973A2C8245D700C18001 /* Links.m in Sources */ = {isa = PBXBuildFile; fileRef = 4FF797392C8245D700C18001 /* Links.m */; };
 		4FF7973B2C8245D700C18001 /* Links.m in Sources */ = {isa = PBXBuildFile; fileRef = 4FF797392C8245D700C18001 /* Links.m */; };
 		4FF8C89A28955491007EC31F /* ClickCycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FF8C89928955490007EC31F /* ClickCycle.swift */; };
+		F538F70213914899999DB680 /* ClickCycleReleaseRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7406DBC35584E67BDC91A96 /* ClickCycleReleaseRouter.swift */; };
+		8388252874E3493BA24F8918 /* ButtonReleaseDispatch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 763B75B1681749D68F0DCC81 /* ButtonReleaseDispatch.swift */; };
 		4FF8C89E28955DC4007EC31F /* CoolTimer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FF8C89D28955DC4007EC31F /* CoolTimer.swift */; };
 		4FF8C89F28955DC4007EC31F /* CoolTimer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FF8C89D28955DC4007EC31F /* CoolTimer.swift */; };
 		4FF8C8A32895AACB007EC31F /* Buttons.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FF8C8A22895AACB007EC31F /* Buttons.swift */; };
@@ -2706,6 +2708,8 @@
 		4FF797382C8245D700C18001 /* Links.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Links.h; sourceTree = "<group>"; };
 		4FF797392C8245D700C18001 /* Links.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = Links.m; sourceTree = "<group>"; };
 		4FF8C89928955490007EC31F /* ClickCycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClickCycle.swift; sourceTree = "<group>"; };
+		E7406DBC35584E67BDC91A96 /* ClickCycleReleaseRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClickCycleReleaseRouter.swift; sourceTree = "<group>"; };
+		763B75B1681749D68F0DCC81 /* ButtonReleaseDispatch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ButtonReleaseDispatch.swift; sourceTree = "<group>"; };
 		4FF8C89D28955DC4007EC31F /* CoolTimer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoolTimer.swift; sourceTree = "<group>"; };
 		4FF8C8A028956DDD007EC31F /* ButtonModifiers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ButtonModifiers.swift; sourceTree = "<group>"; };
 		4FF8C8A22895AACB007EC31F /* Buttons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Buttons.swift; sourceTree = "<group>"; };
@@ -7842,6 +7846,8 @@
 				4FF6661E25F2C93A00689B77 /* ButtonInputReceiver.m */,
 				4FF8C8A22895AACB007EC31F /* Buttons.swift */,
 				4FF8C89928955490007EC31F /* ClickCycle.swift */,
+				E7406DBC35584E67BDC91A96 /* ClickCycleReleaseRouter.swift */,
+				763B75B1681749D68F0DCC81 /* ButtonReleaseDispatch.swift */,
 				4FE479DF2933C87A00B75E9B /* ButtonModifiers.h */,
 				4FE479E02933C87A00B75E9B /* ButtonModifiers.m */,
 				4FF8C8A028956DDD007EC31F /* ButtonModifiers.swift */,
@@ -8981,6 +8987,8 @@
 				4FF0255427B007FC00923107 /* ModifiedDragOutputFakeDrag.m in Sources */,
 				4F7F47C528A5A01600290BBD /* ReactiveConfig.swift in Sources */,
 				4FF8C89A28955491007EC31F /* ClickCycle.swift in Sources */,
+				F538F70213914899999DB680 /* ClickCycleReleaseRouter.swift in Sources */,
+				8388252874E3493BA24F8918 /* ButtonReleaseDispatch.swift in Sources */,
 				4FA83A2E268288D900F3A31B /* PointerConfig.swift in Sources */,
 				4FE78C3B2C50177800C54103 /* DisableSwiftBridging.swift in Sources */,
 				4F8A8DBD287F203D00786BCC /* IOHIDAccelerationTable.cpp in Sources */,

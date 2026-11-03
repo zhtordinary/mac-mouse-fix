@@ -17,10 +17,8 @@ import Cocoa
     static private var buttonModifiers = ButtonModifiers()
     @objc static var useButtonModifiers = false
     
-    /// Vars that we only update once per clickCycle
-    static var modifiers = NSDictionary()
-    static var modifications = NSDictionary()
-    static var maxClickLevel: Int = -1
+    /// Keep per-device/button release pairing separate from the active cycle context.
+    static private var buttonReleaseDispatch = ButtonReleaseDispatch()
     
     /// Init
     private static var isInitialized = false
@@ -31,6 +29,27 @@ import Cocoa
     /// Handling input
     
     @objc static func handleInput(device: Device, button: NSNumber, downNotUp mouseDown: Bool, event: CGEvent) -> MFEventPassThroughEvaluation {
+        return handleInput(
+            device: device,
+            button: button,
+            downNotUp: mouseDown,
+            event: event,
+            candidateModifiers: nil
+        )
+    }
+
+    /// Keeps the production routing path testable without constructing a system CGEvent.
+    static func handleInputForTesting(device: Device, button: NSNumber, downNotUp mouseDown: Bool, modifiers: NSDictionary) -> MFEventPassThroughEvaluation {
+        return handleInput(
+            device: device,
+            button: button,
+            downNotUp: mouseDown,
+            event: nil,
+            candidateModifiers: modifiers
+        )
+    }
+
+    private static func handleInput(device: Device, button: NSNumber, downNotUp mouseDown: Bool, event: CGEvent?, candidateModifiers: NSDictionary?) -> MFEventPassThroughEvaluation {
         assertRunLoop(GlobalEventTapThread.runLoop())
 
         let passThroughEvaluation = kMFEventPassThroughRefusal
@@ -44,33 +63,37 @@ import Cocoa
         
         /// Update stuff when clickCycle starts
         
+        let buttonNumber = ButtonNumber(truncating: button)
+        let deviceID = device.uniqueID().int64Value
         let clickCycleIsActive = clickCycle.isActiveFor(device: device.uniqueID(), button: button)
+        let inputContext: ClickCycleContext
+        if let activeContext = clickCycle.contextForActiveCycle(device: device.uniqueID(), button: button) {
+            inputContext = activeContext
+        } else if mouseDown {
+            let resolvedModifiers = candidateModifiers
+                ?? event.map { Modifiers.modifiers(with: $0) }
+                ?? NSDictionary()
+            inputContext = ClickCycleContext(
+                modifiers: resolvedModifiers,
+                modifications: Remap.modifications(withModifiers: resolvedModifiers) ?? NSDictionary()
+            )
+        } else {
+            inputContext = ClickCycleContext(modifiers: NSDictionary(), modifications: NSDictionary())
+        }
+        var maxClickLevel = 0
         if mouseDown && !clickCycleIsActive {
             
             /// Update active device
-            HelperState.shared.updateActiveDevice(event: event)
-            
-            /// Update modifications
-            let remaps = Remap.remaps /// Why aren't we reusing the remaps from above?
-            self.modifiers = Modifiers.modifiers(with: event)
-            self.modifications = Remap.modifications(withModifiers: modifiers) ?? NSDictionary()
-            
-            /// Get max clickLevel
-            self.maxClickLevel = 0
-            if mouseDown {
-                self.maxClickLevel = RemapsAnalyzer.maxLevel(forButton: button, remaps: remaps, modificationsActingOnThisButton: modifications)
+            if let event = event {
+                HelperState.shared.updateActiveDevice(event: event)
             }
             
+            /// Get max clickLevel for this candidate. It becomes active only if ClickCycle accepts this input.
+            maxClickLevel = RemapsAnalyzer.maxLevel(forButton: button, remaps: remaps, modificationsActingOnThisButton: inputContext.modifications)
         }
         
-        /// Decide passthrough
-        if self.maxClickLevel == 0 {
-            return kMFEventPassThroughApproval
-        }
-        
-        /// Call through clickCycle
-        clickCycle.handleClick(device: device, button: ButtonNumber(truncating: button), downNotUp: mouseDown, maxClickLevel: maxClickLevel,
-                               triggerCallback: { triggerPhase, clickLevel, device, buttonNumber, onRelease in
+        /// Build the callback before the pass-through decision so a registered release can always be consumed.
+        let triggerCallback: ClickCycleTriggerCallback = { triggerPhase, clickLevel, device, buttonNumber, onRelease in
             ///
             /// Update modifiers
             ///
@@ -99,7 +122,7 @@ import Cocoa
             var effectForMouseDownStateOfThisLevelExists: ObjCBool = false
             var effectOfGreaterLevelExists: ObjCBool = false
             
-            RemapsAnalyzer.assessMappingLandscape(withButton: button as NSNumber, level: clickLevel as NSNumber, modificationsActingOnThisButton: modifications, remaps: remaps, thisClickDoBe: &clickActionOfThisLevelExists, thisDownDoBe: &effectForMouseDownStateOfThisLevelExists, greaterDoBe: &effectOfGreaterLevelExists)
+            RemapsAnalyzer.assessMappingLandscape(withButton: button as NSNumber, level: clickLevel as NSNumber, modificationsActingOnThisButton: inputContext.modifications, remaps: remaps, thisClickDoBe: &clickActionOfThisLevelExists, thisDownDoBe: &effectForMouseDownStateOfThisLevelExists, greaterDoBe: &effectOfGreaterLevelExists)
             
             /// Create trigger -> action map based on mappingLandscape
             
@@ -129,7 +152,7 @@ import Cocoa
             guard
                 let (duration, startOrEnd) = map[triggerPhase],
                 //let m1 = modifications[button] as? [AnyHashable: Any],
-                let m1 = modifications.object(forKey: button) as? NSDictionary,
+                let m1 = inputContext.modifications.object(forKey: button) as? NSDictionary,
                 //let m2 = m1[clickLevel as NSNumber] as? [AnyHashable: Any],
                 let m2 = m1.object(forKey: clickLevel) as? NSDictionary,
                 //let m3 = m2[duration],
@@ -142,7 +165,7 @@ import Cocoa
             /// Add modifiers to actionArray for addMode. See Remap -> addMode for context
             ///     Edit: We don't need this anymore now that we're using the addModeSwizzler
             //if actionArray[0][kMFActionDictKeyType] as! String == kMFActionDictTypeAddModeFeedback {
-            //    actionArray[0][kMFRemapsKeyModificationPrecondition] = self.modifiers
+            //    actionArray[0][kMFRemapsKeyModificationPrecondition] = inputContext.modifiers
             //}
 
             /// Notify TrialCounter.swift
@@ -169,8 +192,37 @@ import Cocoa
             ///     (Probably unnecessary, because the only modifiers that can be "deactivated" are buttons. And since there's only one clickCycle, any buttons modifying the current one should already be zombified)
             ///
             Modifiers.handleModificationHasBeenUsed()
-        })
-        
+        }
+
+        let releaseDispatch: ButtonReleaseDispatchResult
+        if mouseDown {
+            releaseDispatch = buttonReleaseDispatch.routeDown(
+                deviceID: deviceID,
+                button: buttonNumber,
+                clickCycleIsActive: clickCycleIsActive,
+                maxClickLevel: maxClickLevel
+            )
+        } else {
+            releaseDispatch = buttonReleaseDispatch.routeRelease(
+                deviceID: deviceID,
+                button: buttonNumber
+            )
+            _ = clickCycle.consumeReleaseCallbacks(device: device, button: buttonNumber)
+        }
+
+        if releaseDispatch.passThrough {
+            return kMFEventPassThroughApproval
+        }
+
+        clickCycle.handleClick(
+            device: device,
+            button: buttonNumber,
+            downNotUp: mouseDown,
+            maxClickLevel: releaseDispatch.maxClickLevel,
+            context: inputContext,
+            triggerCallback: triggerCallback
+        )
+
         return passThroughEvaluation
     }
     

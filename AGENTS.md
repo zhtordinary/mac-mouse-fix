@@ -17,20 +17,17 @@
    - **安装方式（铁律）**：系统 `/Applications/*.app` 采用**直接实体拷贝模式（Direct Copy Install）**，杜绝软链接（Symlink），以确保 macOS 辅助功能 TCC 权限持久稳定，且跨卷 Universal Control 与登录项不丢失。
 
 3. **双机对偶交付流程 (`./scripts/ai-deliver.sh`)**：
-   - 无论在 Mac mini 还是 MacBook Air 上，开发完成后统一使用：
-     ```bash
-     ./scripts/ai-deliver.sh --message '<type>: <describe change>' --files <changed-files>...
-     ```
-   - 源码先独立提交并推送 GitHub，再按变更路径执行交付：
-     - 纯文档、规则或工作流脚本改动（`.md`, `scripts/*`, `docs/*`）：两端仅通过 GitHub fast-forward 对齐；跳过构建、产物提交、安装、签名和 App/Helper 重启。
-     - 运行时改动：Mini 固定负责构建、实体安装及独立的 releases 产物提交；从 Air 发起时通过 SSH 调用 Mini 构建。产物经 GitHub 对齐后，在 Air 实体安装。
-   - 正常交付和 `--resume` 使用相同的路径分类；续交付根据已发布源码提交判断，不重复生成源码 commit。
-   - 对端同步前核对分支、remote、工作区干净及目标提交；离线、脏工作区或无法 fast-forward 时交付失败，保留现场并报告阻塞。
-   - 修改交付流程后运行 `python3 scripts/test_ai_deliver.py`，用隔离 Git/SSH/构建夹具验证文档双向交付、续交付及运行时分支。
+   - 源码交付必须从 Git 登记的独立任务 worktree 发起，任务 worktree 以当前 `origin/personal-use` 为唯一父基线；显式 `--files` 之外的修改、分支漂移、候选多父或远端并发变化都必须失败关闭。
+   - 当前没有可信的真实项目副作用 verifier，首次、恢复和内部交付入口均在 fetch、锁、hook、提交、对端、构建、安装或 push 前硬阻塞；不会保存源码候选。`--request-push-effects` 只是请求，任何旗标或伪造 HANDOFF 均不构成授权或平台证明。
+   - 将来恢复交付须先核验真实平台状态及明确授权，提交前固定显式文件集合对应的 index tree，提交后核对 tree、单一父 SHA、分支和工作树；现有保护仅供未来审阅，不代表当前可执行交付。
+   - `--with-app` 不构成构建、安装或 Helper 服务重启的一揽子授权；每项必须分别明确授权。当前 `setup-app.sh` 无条件拒绝，不执行文件或进程操作；恢复须独立可信地验证产物与目标身份、可恢复替换、权限及竞态，不能仅凭旗标放行。
+   - `--resume SOURCE_SHA` 须先核验真实外部未决状态；不得从旧回执或同 SHA 推断授权。当前恢复同样阻塞。
+   - 对端同步前核对分支、remote、工作区干净及固定目标提交；离线、脏工作区、无法 fast-forward 或结果未知时交付失败，保留现场并报告阻塞。
+   - 修改交付流程后运行 `python3 scripts/test_ai_deliver.py`，用隔离 Git/SSH/build/install/hook 夹具验证真实入口在任何副作用前阻塞，以及隔离替身中的候选 tree/父 SHA 防漂移；另运行 `python3 -B Tests/test_setup_app_safety.py`、`python3 -B Tests/test_button_release_routing.py`、`python3 -B Tests/test_keyboard_event_safety.py` 和 `python3 -B Tests/test_personal_use_actions.py`。fixture 只证明本地控制流，不证明真实托管平台安全。
 
 ## 协作流程入口
 
-修改源码、规则、文档、测试或配置前，必须先阅读 [项目协作流程](docs/collaboration.md)。该流程按 `github-repo-ops 2026.11.01.1` 实例化，详细说明任务 worktree、personal-use 分支、验证、交付和收尾边界。
+修改源码、规则、文档、测试或配置前，必须先阅读 [项目协作流程](docs/collaboration.md)。该流程按 `github-repo-ops 2026.11.03.3` 实例化，详细说明任务 worktree、personal-use 分支、验证、交付和收尾边界。
 
 当前仓库没有项目内 AOCI 资产、Guide、CLI 或 task-bound 服务；不得因为主机上存在其他项目的工具而创建 `.aoci/`、`aoci.txt` 等正式资产，或把当前 cwd 当成治理绑定证明。AOCI 的条件性使用和阻塞规则以 [项目协作流程](docs/collaboration.md) 为准。
 
@@ -38,7 +35,7 @@
    - **严禁覆盖个人版**：绝不执行 `brew upgrade mac-mouse-fix`，必须永久使用本地 `personal-use` 定制构建。
    - **严禁引入内核驱动劫持**：不使用 DriverKit / Karabiner 抓取鼠标，确保 Universal Control 跨屏鼠标漫游 100% 顺畅。
    - **源码与产物双 Commit**：源码修改与 releases app 产物必须拆分为两个独立 commit，严禁混合提交。
-   - 发生中断时，使用 `./scripts/ai-deliver.sh --resume <source-sha>` 继续，绝不重复生成源码 commit。
+   - 发生中断时，只有真实项目守卫已核验同 SHA 外部未决状态后，才使用 `./scripts/ai-deliver.sh --request-push-effects --resume <完整 source-sha>` 继续；构建、安装及 Helper 服务重启必须分别明确授权并通过独立验证，绝不重复生成源码 commit；当前入口无条件阻塞。守卫缺失或结果未知时保留现场。
 
 ## 任务临时资源清理
 
