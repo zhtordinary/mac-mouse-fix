@@ -77,6 +77,17 @@ class CollaborationContractTests(unittest.TestCase):
         self.assertIn("不保存 commit", workflow)
         self.assertIn("各自明确授权", workflow)
 
+    def test_local_development_does_not_claim_delivery_is_available(self):
+        agents = (ROOT / "AGENTS.md").read_text()
+        workflow = (ROOT / "docs/collaboration.md").read_text()
+        self.assertIn("不因缺少远端 verifier 阻断本地开发", agents)
+        self.assertIn("2026.11.05.2", workflow)
+        self.assertIn("a24a0e07eb75faafac0f824091e705e2aab05bc9", workflow)
+        self.assertIn("已核验的本地 remote-tracking SHA 只作为开发基线", workflow)
+        self.assertIn("不是远端最新状态证明", workflow)
+        self.assertIn("不得手动提交绕过现行门禁", workflow)
+        self.assertIn("当前项目没有已核验的真实副作用守卫", workflow)
+
     def test_worktree_ignore_rule_is_active(self):
         result = subprocess.run(
             ["git", "check-ignore", "-q", "--no-index", ".worktrees/ignore-check"],
