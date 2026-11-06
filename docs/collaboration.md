@@ -1,6 +1,6 @@
 # Mac Mouse Fix 项目协作流程
 
-本文件是 Mac Mouse Fix 的详细协作契约。根目录 `AGENTS.md` 是入口；修改源码、规则、文档、测试或配置前必须先阅读本文件。本契约按 `github-repo-ops 2026.11.03.3` 实例化，本地开发边界参考 `2026.11.05.2`（`a24a0e07eb75faafac0f824091e705e2aab05bc9`）修订；项目文件随版本控制，日常不依赖全局 Skill 安装目录。
+本文件是 Mac Mouse Fix 的详细协作契约。根目录 `AGENTS.md` 是入口；修改源码、规则、文档、测试或配置前必须先阅读本文件。本契约按 `github-repo-ops 2026.11.03.3` 实例化，本地开发边界参考 `2026.11.05.2`（`a24a0e07eb75faafac0f824091e705e2aab05bc9`）修订，最新规范对齐 `2026.11.06.1`；项目文件随版本控制，日常不依赖全局 Skill 安装目录。
 
 ## 项目适配结果
 
@@ -132,5 +132,7 @@ git worktree list --porcelain
 python3 scripts/scan-root-empty.py "/Users/zibuyu/Projects/mac-mouse-fix"
 python3 scripts/scan-root-empty.py "$PWD"
 ```
+
+**单目标闭环契约（对齐 Reader 规范）：** 任务交付与工作树清理是一个连贯闭环。项目不应将交付割裂为“阶段 A 源码交付完成，阶段 B 另行收尾”导致孤儿工作树长期滞留磁盘。在确认主线推送成功且双机对齐后，发起交付的会话必须在当前轮次内立即执行收尾清理（从主 checkout 执行 `git worktree remove <精确路径>` 并按策略执行 `git branch -d <任务分支>`）；仅在明确属于多阶段未结项任务，或存在存活会话与活动进程实际依赖原路径时，才允许保留并报告为“部分完成”及剩余事项。活动会话的 SSH `ControlMaster`、MCP argv 中单独出现任务路径不阻断清理。严禁在门禁或交付流程中引入无实现的空验证器硬阻断；安全由明确授权与可用探针保障。
 
 对根层扫描的每个候选报告“已清理／合法保留／待确认”。本项目基线中的 `mac-mouse-fix-scripts` 空目录未获删除授权，保持并报告。只有在未来已合入、干净、无会话/进程路径依赖且确认分支 tip 已交付时，才可从主 checkout 使用 `git worktree remove <精确路径>` 和默认 `git branch -d <任务分支>`；禁止 `-D`、`prune` 或跟随链接扩大范围。

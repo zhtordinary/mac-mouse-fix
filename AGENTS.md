@@ -28,7 +28,9 @@
 
 ## 协作流程入口
 
-修改源码、规则、文档、测试或配置前，必须先阅读 [项目协作流程](docs/collaboration.md)。该流程按 `github-repo-ops 2026.11.03.3` 实例化，详细说明任务 worktree、personal-use 分支、验证、交付和收尾边界。
+修改源码、规则、文档、测试或配置前，必须先阅读 [项目协作流程](docs/collaboration.md)。该流程按 `github-repo-ops 2026.11.03.3` 实例化，最新规范对齐 `2026.11.06.1`，详细说明任务 worktree、personal-use 分支、验证、交付和收尾边界。
+
+**单目标闭环契约（对齐 Reader 规范）：** 任务采用单一目标闭环交付。源码合入 `origin/personal-use` 且两台 Mac 快进对齐后，由发起交付的会话立即在当前轮次内执行收尾清理：在确认任务树干净且无活动依赖时，直接从主 checkout 执行 `git worktree remove`，并用 `git branch -d` 删除已合入分支；杜绝已合入无依赖的任务树作为孤儿工作树长期滞留磁盘。仍需继续执行或明确属于多阶段进行中的任务，才保留现场并在回复中明确标为“部分完成”及剩余事项。会话 cwd、MCP argv 或 SSH ControlMaster 中单独出现任务路径不阻断清理。严禁在交付脚本或发布流程中设置无实现的空验证器硬阻断。
 
 当前仓库没有项目内 AOCI 资产、Guide、CLI 或 task-bound 服务；不得因为主机上存在其他项目的工具而创建 `.aoci/`、`aoci.txt` 等正式资产，或把当前 cwd 当成治理绑定证明。AOCI 的条件性使用和阻塞规则以 [项目协作流程](docs/collaboration.md) 为准。
 
