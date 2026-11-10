@@ -58,7 +58,8 @@ class CollaborationContractTests(unittest.TestCase):
             "verify_candidate_tree",
             "verify_artifact_candidate",
             "GUARD_HANDOFF",
-            "PROJECT_GUARD=''",
+            "--with-git-push",
+            "--confirm-external-automation",
             "PUSH=blocked",
             "PUSH=blocked",
             "App 阶段未授权",
@@ -71,10 +72,10 @@ class CollaborationContractTests(unittest.TestCase):
         workflow = (ROOT / "docs/collaboration.md").read_text()
         self.assertIn("普通 Git push 不是纯本地 Git 操作", workflow)
         self.assertIn("真实外部未决状态", workflow)
-        self.assertIn("当前项目没有已核验的真实副作用守卫", workflow)
+        self.assertIn("--confirm-external-automation", workflow)
         self.assertIn("commit hook 插入额外文件", workflow)
         self.assertIn("`setup-app.sh` 当前在任何文件或进程操作前无条件拒绝", workflow)
-        self.assertIn("不保存 commit", workflow)
+        self.assertIn("保存本地候选", workflow)
         self.assertIn("各自明确授权", workflow)
 
     def test_local_development_does_not_claim_delivery_is_available(self):
@@ -86,7 +87,7 @@ class CollaborationContractTests(unittest.TestCase):
         self.assertIn("已核验的本地 remote-tracking SHA 只作为开发基线", workflow)
         self.assertIn("不是远端最新状态证明", workflow)
         self.assertIn("不得手动提交绕过现行门禁", workflow)
-        self.assertIn("当前项目没有已核验的真实副作用守卫", workflow)
+        self.assertIn("--confirm-external-automation", workflow)
 
     def test_worktree_ignore_rule_is_active(self):
         result = subprocess.run(

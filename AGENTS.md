@@ -19,16 +19,16 @@
 3. **双机对偶交付流程 (`./scripts/ai-deliver.sh`)**：
    - 源码交付必须从 Git 登记的独立任务 worktree 发起，任务 worktree 以当前 `origin/personal-use` 为唯一父基线；显式 `--files` 之外的修改、分支漂移、候选多父或远端并发变化都必须失败关闭。
    - 不因缺少远端 verifier 阻断本地开发：按项目契约核验基线后可在独立任务 worktree 编辑和做定向检查；这不授予提交或交付授权。
-   - 当前没有可信的真实项目副作用 verifier，首次、恢复和内部交付入口均在 fetch、锁、hook、提交、对端、构建、安装或 push 前硬阻塞；不会保存源码候选。`--request-push-effects` 只是请求，任何旗标或伪造 HANDOFF 均不构成授权或平台证明。
-   - 将来恢复交付须先核验真实平台状态及明确授权，提交前固定显式文件集合对应的 index tree，提交后核对 tree、单一父 SHA、分支和工作树；现有保护仅供未来审阅，不代表当前可执行交付。
+   - 支持 `--source-only` 纯本地候选准备；普通 `--message ... --files ...` 入口可在任务树内创建本地源码候选，并在无 push 授权时于 `PUSH=blocked` 停止。Git push 及其外部自动化必须显式提供 `--with-git-push --confirm-external-automation`（兼容 `--authorize-git-push` 与 `--request-push-effects`）；严禁在交付脚本中设置无实现的空验证器或无权限接口硬死锁。
+   - 内部阶段使用绑定项目、分支、App 阶段的 handoff；handoff 不是单独授权，仍须显式 push 授权、固定文件/tree/父 SHA 和独立 App/服务授权。候选提交必须仍由项目入口固定文件、tree、父 SHA 和分支；不要手动提交绕过入口。
    - `--with-app` 不构成构建、安装或 Helper 服务重启的一揽子授权；每项必须分别明确授权。当前 `setup-app.sh` 无条件拒绝，不执行文件或进程操作；恢复须独立可信地验证产物与目标身份、可恢复替换、权限及竞态，不能仅凭旗标放行。
    - `--resume SOURCE_SHA` 须先核验真实外部未决状态；不得从旧回执或同 SHA 推断授权。当前恢复同样阻塞。
    - 对端同步前核对分支、remote、工作区干净及固定目标提交；离线、脏工作区、无法 fast-forward 或结果未知时交付失败，保留现场并报告阻塞。
-   - 修改交付流程后运行 `python3 scripts/test_ai_deliver.py`，用隔离 Git/SSH/build/install/hook 夹具验证真实入口在任何副作用前阻塞，以及隔离替身中的候选 tree/父 SHA 防漂移；另运行 `python3 -B Tests/test_setup_app_safety.py`、`python3 -B Tests/test_button_release_routing.py`、`python3 -B Tests/test_keyboard_event_safety.py` 和 `python3 -B Tests/test_personal_use_actions.py`。fixture 只证明本地控制流，不证明真实托管平台安全。
+   - 修改交付流程后运行 `python3 scripts/test_ai_deliver.py`，用隔离 Git/SSH/build/install/hook 夹具验证本地候选路径、真实 push 入口和恢复入口的边界，以及隔离替身中的候选 tree/父 SHA 防漂移；另运行 `python3 -B Tests/test_setup_app_safety.py`、`python3 -B Tests/test_button_release_routing.py`、`python3 -B Tests/test_keyboard_event_safety.py` 和 `python3 -B Tests/test_personal_use_actions.py`。fixture 只证明本地控制流，不证明真实托管平台安全。
 
 ## 协作流程入口
 
-修改源码、规则、文档、测试或配置前，必须先阅读 [项目协作流程](docs/collaboration.md)。该流程按 `github-repo-ops 2026.11.03.3` 实例化，最新规范对齐 `2026.11.06.1`，详细说明任务 worktree、personal-use 分支、验证、交付和收尾边界。
+修改源码、规则、文档、测试或配置前，必须先阅读 [项目协作流程](docs/collaboration.md)。该流程按 `github-repo-ops 2026.11.03.3` 实例化，最新规范对齐 `2026.11.06.2`，详细说明任务 worktree、personal-use 分支、验证、交付和收尾边界。
 
 **单目标闭环契约（对齐 Reader 规范）：** 任务采用单一目标闭环交付。源码合入 `origin/personal-use` 且两台 Mac 快进对齐后，由发起交付的会话立即在当前轮次内执行收尾清理：在确认任务树干净且无活动依赖时，直接从主 checkout 执行 `git worktree remove`，并用 `git branch -d` 删除已合入分支；杜绝已合入无依赖的任务树作为孤儿工作树长期滞留磁盘。仍需继续执行或明确属于多阶段进行中的任务，才保留现场并在回复中明确标为“部分完成”及剩余事项。会话 cwd、MCP argv 或 SSH ControlMaster 中单独出现任务路径不阻断清理。严禁在交付脚本或发布流程中设置无实现的空验证器硬阻断。
 
@@ -38,7 +38,7 @@
    - **严禁覆盖个人版**：绝不执行 `brew upgrade mac-mouse-fix`，必须永久使用本地 `personal-use` 定制构建。
    - **严禁引入内核驱动劫持**：不使用 DriverKit / Karabiner 抓取鼠标，确保 Universal Control 跨屏鼠标漫游 100% 顺畅。
    - **源码与产物双 Commit**：源码修改与 releases app 产物必须拆分为两个独立 commit，严禁混合提交。
-   - 发生中断时，只有真实项目守卫已核验同 SHA 外部未决状态后，才使用 `./scripts/ai-deliver.sh --request-push-effects --resume <完整 source-sha>` 继续；构建、安装及 Helper 服务重启必须分别明确授权并通过独立验证，绝不重复生成源码 commit；当前入口无条件阻塞。守卫缺失或结果未知时保留现场。
+   - 发生中断时，只有真实项目守卫已核验同 SHA 外部未决状态后，才使用 `./scripts/ai-deliver.sh --request-push-effects --resume <完整 source-sha>` 继续；构建、安装及 Helper 服务重启必须分别明确授权并通过独立验证，绝不重复生成源码 commit。守卫缺失或结果未知时保留现场；本地候选可保留在任务树中，不能据此声称已合入。
 
 ## 任务临时资源清理
 
@@ -50,7 +50,7 @@
 
 ## 提交前与交付后核验
 
-- 接手时记录根层候选、Git 状态和 worktree 登记基线。提交/交付前，对主 checkout 执行 `python3 "$HOME/.agents/skills/github-repo-ops/scripts/scan-root-empty.py" "<本机主checkout绝对路径>"`；不同于主 checkout 的本任务工作树另扫根层。
+- 接手时记录根层候选、Git 状态和 worktree 登记基线。项目内 `scripts/scan-root-empty.py` 是唯一扫描入口；提交/交付前，对主 checkout 和不同于主 checkout 的本任务工作树分别执行 `python3 -B scripts/scan-root-empty.py "<绝对路径>"`。日常执行不依赖全局 Skill 安装目录。
 - 扫描只发现根目录直接子项中的物理空目录和零字节普通文件，不递归、不读取文件内容、不跟随符号链接；非空目录只检查首条目。隐藏和 ignored 对象同样列出；发现阶段不运行 Git、构建或全仓哈希。
 - 将完整 `candidates` 清单交给 AI 逐项判断用途、归属及是否误创建；不按名称、正则、命令名黑名单或是否新增过滤候选，也不凭名字或空状态删除。合法的零字节 `.gitkeep`、约定占位目录等说明用途后保留；存疑项保留并报告待确认信息。
 - 仅处理 AI 确认且在本任务授权范围内的错误产物。操作前重新确认路径身份、类型、空状态及无有效引用；有并发写入或类型变化时停止。普通空目录只用 `rmdir`，零字节普通文件使用废纸篓或项目已有可恢复方式；工作树用 Git 原生命令。保护 WIP、用户数据和符号链接，不用强删、prune、覆盖或新增 ignore 掩盖问题。

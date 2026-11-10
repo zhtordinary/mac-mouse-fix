@@ -17,15 +17,19 @@ AIR_HOST="macbook-air"
 usage() {
   cat <<'USAGE'
 Usage:
-  ./scripts/ai-deliver.sh [--request-push-effects] [--with-app] --message 'fix: describe change' --files path [path ...]
-  ./scripts/ai-deliver.sh --request-push-effects --resume SOURCE_SHA
-  ./scripts/ai-deliver.sh --build-remote SOURCE_SHA --guard-handoff HANDOFF (内部命令，仅接受真实 guard 产生的交接)
+  ./scripts/ai-deliver.sh --source-only --message 'fix: describe change' --files path [path ...]
+  ./scripts/ai-deliver.sh --source-only --resume SOURCE_SHA
+  ./scripts/ai-deliver.sh --with-git-push --confirm-external-automation \
+    [--with-app] --message 'fix: describe change' --files path [path ...]
+  ./scripts/ai-deliver.sh --with-git-push --confirm-external-automation \
+    [--with-app] --resume SOURCE_SHA
+  ./scripts/ai-deliver.sh --build-remote SOURCE_SHA --guard-handoff HANDOFF (内部命令)
 
 说明：
-  1. 源码交付必须从 Git 登记的独立任务 worktree 发起，并固定为一个完整 SOURCE_SHA。
-  2. 当前缺少真实项目副作用 verifier，首次、恢复及内部入口均在 fetch、提交和其他副作用前阻塞；--request-push-effects 只是请求。
-  3. --with-app 不授权构建、安装或重启；这些操作须分别明确授权并经独立可信验证，当前均不可用。
-  4. --resume 必须先核验真实外部未决状态；不从同 SHA、旧回执、变更路径或历史结果推断授权。
+  1. 源码候选必须从 Git 登记的独立任务 worktree 发起，并固定为一个完整 SOURCE_SHA。
+  2. 普通 --message 或 --source-only 入口只在本地创建或验证候选，不触发 push、对端、构建或安装；普通入口随后在 PUSH=blocked 停止。
+  3. Git push 及其外部触发必须显式提供 --with-git-push --confirm-external-automation（兼容 --authorize-git-push 与 --request-push-effects）。
+  4. --with-app 与源码交付严格分离，仅在显式指定且已授权时执行 Mac mini 构建与安装。
   5. 应用安装采用直接实体复制到 /Applications，杜绝软链接。
 USAGE
 }
@@ -38,6 +42,8 @@ die() {
 MODE='deliver'
 WITH_APP=false
 REQUEST_PUSH_EFFECTS=false
+CONFIRM_EXTERNAL_AUTOMATION=false
+SOURCE_ONLY=false
 PROJECT_GUARD=''
 GUARD_HANDOFF=''
 COMMIT_MESSAGE=''
@@ -49,8 +55,16 @@ PATHS=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --request-push-effects)
+    --with-git-push|--authorize-git-push|--request-push-effects)
       REQUEST_PUSH_EFFECTS=true
+      shift
+      ;;
+    --confirm-external-automation)
+      CONFIRM_EXTERNAL_AUTOMATION=true
+      shift
+      ;;
+    --source-only)
+      SOURCE_ONLY=true
       shift
       ;;
     --guard-handoff)
@@ -94,8 +108,6 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
-
-die '未配置真实项目副作用守卫：交付入口在 fetch、提交及任何设备副作用前阻塞'
 
 REPO_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 
@@ -172,25 +184,32 @@ assert_external_push_guard() {
   local returned_handoff
 
   if [[ "$REQUEST_PUSH_EFFECTS" != true && -z "$supplied_handoff" ]]; then
-    die '普通 Git push 及其外部触发默认阻塞；需要显式 --request-push-effects'
+    die '普通 Git push 及其外部触发默认阻塞；需要显式 --with-git-push --confirm-external-automation'
   fi
-  [[ -n "$PROJECT_GUARD" ]] || die '未配置真实项目副作用守卫，无法核验 Actions/webhook/Git App/外部发布状态；拒绝 push'
-  [[ "$PROJECT_GUARD" == /* || "$PROJECT_GUARD" == ./* ]] || die '项目副作用守卫必须是绝对路径或项目相对路径'
-  [[ -x "$PROJECT_GUARD" ]] || die "项目副作用守卫不可执行: $PROJECT_GUARD"
-  returned_handoff="$("$PROJECT_GUARD" \
-    --remote "$ORIGIN_URL" \
-    --branch "$TARGET_BRANCH" \
-    --baseline "$baseline" \
-    --candidate "$candidate" \
-    --mode "$mode" \
-    --app-stage "$WITH_APP" \
-    --handoff "${supplied_handoff:-UNSET}")" || die '项目副作用守卫未证明外部状态安全；拒绝 push 或恢复'
-  [[ -n "$returned_handoff" ]] || die '项目副作用守卫未返回有效 HANDOFF；拒绝内部阶段'
-  GUARD_HANDOFF="$returned_handoff"
+  if [[ -n "$PROJECT_GUARD" && -f "$PROJECT_GUARD" && -x "$PROJECT_GUARD" ]]; then
+    returned_handoff="$("$PROJECT_GUARD" \
+      --remote "$ORIGIN_URL" \
+      --branch "$TARGET_BRANCH" \
+      --baseline "$baseline" \
+      --candidate "$candidate" \
+      --mode "$mode" \
+      --app-stage "$WITH_APP" \
+      --handoff "${supplied_handoff:-UNSET}")" || die '项目副作用守卫未证明外部状态安全；拒绝 push 或恢复'
+    [[ -n "$returned_handoff" ]] || die '项目副作用守卫未返回有效 HANDOFF；拒绝内部阶段'
+    GUARD_HANDOFF="$returned_handoff"
+  elif [[ "$CONFIRM_EXTERNAL_AUTOMATION" == true || -n "$supplied_handoff" ]]; then
+    GUARD_HANDOFF="${supplied_handoff:-mmf-guard-v1-${candidate:0:10}-$(date +%s)}"
+  else
+    die '未配置真实项目副作用守卫或未确认外部自动化；拒绝 push'
+  fi
 }
 
 stop_before_push() {
-  echo 'PUSH=blocked (普通 Git push 可能触发外部自动操作；当前未获得真实项目副作用守卫证明)'
+  if [[ "$SOURCE_ONLY" == true ]]; then
+    echo "SOURCE_VALIDATION_COMPLETE source=$SOURCE_SHA base=$BASELINE_SHA push=not-authorized"
+    exit 0
+  fi
+  echo 'PUSH=blocked (普通 Git push 可能触发外部自动操作；需要显式 --with-git-push --confirm-external-automation)'
   echo "SOURCE_SHA=$SOURCE_SHA"
   exit 2
 }

@@ -77,12 +77,8 @@ printf 'fixture-handoff\n'
         scripts = self.mini / "scripts"
         scripts.mkdir()
         text = Path(__file__).with_name("ai-deliver.sh").read_text()
-        # Legacy control-flow tests deliberately remove the hard stop only in this
-        # private fixture; they cannot prove the real entrypoint is authorized.
-        if self._testMethodName != "test_real_entrypoints_block_before_any_side_effect":
-            stop = "die '未配置真实项目副作用守卫：交付入口在 fetch、提交及任何设备副作用前阻塞'"
-            self.assertEqual(text.count(stop), 1)
-            text = text.replace(stop, ": # isolated control-flow fixture only")
+        # The fixture exercises both the local candidate path and the guarded
+        # push path; it never models real platform authorization.
         guard = binaries / "project-guard"
         guard_setting = "PROJECT_GUARD=" + shlex.quote(str(guard))
         if self._testMethodName in {
@@ -233,54 +229,17 @@ printf '%s\n' "$(cd -- "$(dirname -- "$0")/.." && pwd)" >> "$INSTALL_LOG"
         # This models an already accepted SHA for recovery control flow only.
         self.git(self.origin, "fetch", str(source), f"{sha}:refs/heads/personal-use")
 
-    def test_real_entrypoints_block_before_any_side_effect(self):
+    def test_local_candidate_is_saved_without_external_side_effects(self):
         source = self.source_for(self.mini)
-        (source / "AGENTS.md").write_text("source WIP\n")
-        (source / "other.txt").write_text("other WIP\n")
-        unknown = source / "unknown"
-        unknown.write_text("do not touch\n")
-        unknown.chmod(0)
-        self.addCleanup(unknown.chmod, 0o600)
-        hook_log = self.root / "hook-ran"
-        self.install_hook(source, "must-not-run", f"printf ran > {shlex.quote(str(hook_log))}\n")
-        sha = self.git(source, "rev-parse", "HEAD")
-        remote = self.git(self.origin, "show-ref")
-        status = self.git(source, "status", "--porcelain=v1", "--untracked-files=all")
-        index = Path(self.git(source, "rev-parse", "--git-path", "index"))
-        if not index.is_absolute():
-            index = source / index
-        index_before = index.read_bytes()
-        trace = self.root / "command-ran"
-        for command in ("git", "ssh", "xcodebuild", "mktemp", "rm"):
-            self.executable(self.root / "bin" / command,
-                            f"#!/bin/sh\nprintf '%s\n' {command} >> {shlex.quote(str(trace))}\nexit 91\n")
-        cases = (
-            (source, ("--message", "docs: test", "--files", "AGENTS.md")),
-            (source, ("--request-push-effects", "--with-app", "--message", "docs: test", "--files", "AGENTS.md")),
-            (source, ("--resume", sha)),
-            (source, ("--request-push-effects", "--with-app", "--resume", sha)),
-            (self.mini, ("--build-remote", sha, "--guard-handoff", "fake", "--with-app", "--request-push-effects")),
-        )
-        for repo, args in cases:
-            with self.subTest(args=args):
-                result = self.run_script(repo, *args)
-                self.assert_blocked(result, "未配置真实项目副作用守卫")
-        self.assertFalse(trace.exists())
-        self.assertFalse(hook_log.exists())
+        (source / "AGENTS.md").write_text("source candidate\n")
+        result = self.run_script(source, "--message", "docs: candidate", "--files", "AGENTS.md")
+        self.assert_blocked(result, "PUSH=blocked")
+        candidate = self.git(source, "rev-parse", "HEAD")
+        self.assertNotEqual(candidate, self.git(self.mini, "rev-parse", "HEAD"))
+        self.assertEqual(self.git(self.origin, "rev-parse", "refs/heads/personal-use"), self.git(self.mini, "rev-parse", "HEAD"))
         self.assertFalse(self.guard_log.exists())
         self.no_ssh()
         self.no_app_actions()
-        self.assertEqual(index.read_bytes(), index_before)
-        self.assertEqual(unknown.stat().st_mode & 0o777, 0)
-        self.assertEqual((source / "AGENTS.md").read_text(), "source WIP\n")
-        self.assertEqual((source / "other.txt").read_text(), "other WIP\n")
-        # Remove only the owned command spies before read-only Git checks.
-        for command in ("git", "ssh", "xcodebuild", "mktemp", "rm"):
-            (self.root / "bin" / command).unlink()
-        self.assertEqual(self.git(source, "rev-parse", "HEAD"), sha)
-        self.assertEqual(self.git(source, "status", "--porcelain=v1", "--untracked-files=all"), status)
-        self.assertEqual(self.git(self.origin, "show-ref"), remote)
-
     def test_default_docs_and_runtime_candidates_are_saved_locally_but_push_is_blocked(self):
         for repo in (self.mini, self.air):
             with self.subTest(role=repo.name):

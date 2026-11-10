@@ -1,6 +1,6 @@
 # Mac Mouse Fix 项目协作流程
 
-本文件是 Mac Mouse Fix 的详细协作契约。根目录 `AGENTS.md` 是入口；修改源码、规则、文档、测试或配置前必须先阅读本文件。本契约按 `github-repo-ops 2026.11.03.3` 实例化，本地开发边界参考 `2026.11.05.2`（`a24a0e07eb75faafac0f824091e705e2aab05bc9`）修订，最新规范对齐 `2026.11.06.1`；项目文件随版本控制，日常不依赖全局 Skill 安装目录。
+本文件是 Mac Mouse Fix 的详细协作契约。根目录 `AGENTS.md` 是入口；修改源码、规则、文档、测试或配置前必须先阅读本文件。本契约按 `github-repo-ops 2026.11.03.3` 实例化，本地开发边界参考 `2026.11.05.2`（`a24a0e07eb75faafac0f824091e705e2aab05bc9`）修订，最新规范对齐 `2026.11.06.2`；项目文件随版本控制，日常不依赖全局 Skill 安装目录。
 
 ## 项目适配结果
 
@@ -14,8 +14,8 @@
 | 允许编辑 | 本任务 worktree；主 checkout 仅在已授权的 Git 对齐或显式 App 阶段由交付入口使用，日常源码修改不写入主 checkout |
 | 定向检查 | 规则/文档/测试/配置改动：`python3 -B Tests/test_collaboration_contract.py`、`python3 -B scripts/test_ai_deliver.py`、`python3 -B Tests/test_personal_use_actions.py`、`python3 -B Tests/test_button_release_routing.py`、`python3 -B Tests/test_setup_app_safety.py`、`python3 -B Tests/test_keyboard_event_safety.py`、`python3 scripts/verify-personal-use-build.py`（适用时） |
 | 最终检查 | `git diff --check`、显式文件清单、`git status --porcelain=v1 --untracked-files=all`、worktree 登记及两棵树的根层扫描 |
-| 交付入口 | `./scripts/ai-deliver.sh` 从独立任务 worktree 发起；固定 `origin`、`personal-use`、单父 SOURCE_SHA 和两端 fast-forward 边界。普通 push 可能触发外部自动操作，当前无真实项目副作用守卫，所有交付入口在副作用前阻塞 |
-| 规则/文档候选边界 | 当前入口不执行本地提交；push、merge、land、publish、安装和重启仍是分别授权的后续阶段 |
+| 交付入口 | `./scripts/ai-deliver.sh` 从独立任务 worktree 发起；固定 `origin`、`personal-use`、单父 SOURCE_SHA 和两端 fast-forward 边界。支持 `--source-only` 纯本地候选准备；普通 `--message` 无 push 授权时创建本地候选并在 `PUSH=blocked` 停止；push 交付必须显式提供 `--with-git-push --confirm-external-automation`（兼容 `--authorize-git-push` 与 `--request-push-effects`） |
+| 规则/文档候选边界 | 普通入口可在任务树内创建本地源码候选；push、merge、land、publish、安装和重启仍是分别授权的后续阶段 |
 | 构建/发布 | 构建、安装和 Helper 服务重启须分别明确授权；`--with-app` 不能一揽子授权。当前入口及安装均硬阻塞 |
 | 任务分支收尾 | 未合入、dirty、活跃引用或归属不明时保留任务 worktree；合入后才按本契约核对并安全收尾，不用 `branch -D` 或批量 prune |
 | 证据 | 记录完整基线/候选 SHA、显式文件、命令退出码、根层候选和未验证阶段；不记录凭据、token、私钥或用户数据 |
@@ -58,9 +58,9 @@
 
 ## 开发、验证与本地提交
 
-1. 规则、文档、测试和配置改动不得改变产品运行时行为；运行时源码改动必须单独验证。缺少远端 verifier 不阻断已登记任务树中的编辑和定向检查；已核验的本地 remote-tracking SHA 只作为开发基线，不是远端最新状态证明。所有交付入口当前在任何 fetch、hook 或提交前硬阻塞，不保存候选；不得手动提交绕过现行门禁。本地检查不授予两端对齐、Xcode 构建、签名、`/Applications` 安装或 Helper/App 重启的权限。
+1. 规则、文档、测试和配置改动不得改变产品运行时行为；运行时源码改动必须单独验证。缺少远端 verifier 不阻断已登记任务树中的编辑和定向检查；已核验的本地 remote-tracking SHA 只作为开发基线，不是远端最新状态证明。普通 `--message ... --files ...` 入口允许在任务树内创建本地候选，随后在 `PUSH=blocked` 停止；`--request-push-effects`、`--resume` 和内部入口在副作用前硬阻塞。不得手动提交绕过现行门禁，也不得手动 push。本地检查或候选提交不授予两端对齐、Xcode 构建、签名、`/Applications` 安装或 Helper/App 重启的权限。
 
-2. `scripts/ai-deliver.sh` 的首次、恢复和内部入口当前均在副作用前硬阻塞，不能仅凭旗标或 HANDOFF 放行。未来实现须经真实平台 verifier 和明确授权，并保留显式文件集合 index tree、单一父 SHA、分支及工作树核验；commit hook 插入额外文件或改写选中文件须阻塞。构建、安装和 Helper 服务重启须各自明确授权，`--with-app` 不是一揽子授权。
+2. `scripts/ai-deliver.sh` 的普通源码入口可以保存本地候选，但没有真实守卫时不能 push；恢复、内部入口和任何主动副作用仍在副作用前硬阻塞，不能仅凭旗标或 HANDOFF 放行。未来实现须经真实平台 verifier 和明确授权，并保留显式文件集合 index tree、单一父 SHA、分支及工作树核验；commit hook 插入额外文件或改写选中文件须阻塞。构建、安装和 Helper 服务重启须各自明确授权，`--with-app` 不是一揽子授权。
 
 3. 提交前至少执行：
 
@@ -80,15 +80,15 @@
 
    `verify-personal-use-build.py` 是源码个人版契约检查；即使任务没有产品代码变化，也可用于证明既有 `PERSONAL_USE` 规则未被规则/文档改动破坏。若环境缺少 Xcode，不因此构建产品；在规则/文档/测试/配置任务中只报告未执行的构建覆盖。
 
-4. 仅在副作用已独立核验并明确授权后，才可显式 `git add` 任务文件并创建本地候选提交；当前缺少 verifier，禁止以手动提交绕过交付门禁。提交成功不等于合入、双机对齐或发布成功；报告中分别列出 local commit、push、merge、alignment 和 publish 状态，只声明实际完成的阶段。
+4. 普通 `--message ... --files ...` 入口可以在任务树内显式 `git add` 并创建本地候选；本地候选必须仍经过入口的文件、tree、父 SHA、分支和工作树核验，不得手动提交绕过入口。没有 `--with-git-push --confirm-external-automation` 授权时入口在 `PUSH=blocked` 停止；提交成功不等于合入、双机对齐或发布成功，报告中分别列出 local commit、push、merge、alignment 和 publish 状态，只声明实际完成的阶段。
 
-5. 若按项目授权交付，必须重新读取当前 `personal-use` 基线并从独立任务 worktree 执行。普通 push 前必须有真实项目副作用守卫及明确 `--request-push-effects`；同 SHA 恢复先核验真实外部未决状态，不能凭旧回执或 Git 接受状态重放。构建、安装和 Helper 服务重启还须分别明确授权及独立验证。当前守卫缺失、外部状态未知、远端或另一 checkout 脏、分支错误或主线前进时，入口必须失败并保留现场；不得强推或重建源码提交。
+5. 若按项目授权交付，必须重新读取当前 `personal-use` 基线并从独立任务 worktree 执行。普通 push 前必须有明确 `--with-git-push --confirm-external-automation` 授权；同 SHA 恢复先核验真实外部未决状态，不能凭旧回执或 Git 接受状态重放。构建、安装和 Helper 服务重启还须分别明确授权及独立验证。外部状态未知、远端或另一 checkout 脏、分支错误或主线前进时，主动交付入口必须失败并保留现场；普通本地候选不执行远端或设备副作用，不得强推或重建源码提交。
 
 ## Git push 外部副作用与恢复
 
-普通 Git push 不是纯本地 Git 操作：它可能触发仓库/组织 Actions、webhook、Git App、托管平台构建或外部发布。项目必须由真实、当前、可核验的项目副作用守卫检查目标 remote/ref、完整候选与基线、触发配置、明确授权、真实拥有者队列/执行及同 SHA 未决状态；本机锁、分支名、无本地 App 调用、静态 workflow 匹配和通用 fixture 都不能证明这些条件。
+普通 Git push 不是纯本地 Git 操作：它可能触发仓库/组织 Actions、webhook、Git App、托管平台构建或外部发布。项目严禁使用无实现的空验证器硬阻断开发，同时必须由明确的命令行外部自动化确认（`--with-git-push --confirm-external-automation`）和真实 Git 远端事实检查目标 remote/ref、完整候选与基线、单父 commit 与 tree 完整性。
 
-当前项目没有已核验的真实副作用守卫或平台实时状态接口。因此 `scripts/ai-deliver.sh` 首次、恢复和内部入口均在 fetch、锁、hook、提交、SSH、构建、安装和 push 前阻塞，不保存 commit；`--request-push-effects` 和伪造 HANDOFF 均不能授权。候选 tree/父 SHA 门禁的隔离替身回归不是平台安全证据。
+普通 `--message` 或 `--source-only` 只在任务树内固定并保存本地候选，随后以 `PUSH=blocked` 停止，不执行 push、SSH、构建或安装；`--resume` 对已接受的同 SHA 也必须先核验真实外部未决状态。旧回执、Git remote 已包含 SHA、同一分支或本地测试通过都不能代替核验；状态未知或未决时保持阻塞，不重放 push、发布或完成入口。隔离 fixture 只验证入口的失败关闭和参数分流，不是平台安全或实时触发状态证据。
 
 `--resume` 对已接受的同 SHA 也必须先核验真实外部未决状态。旧回执、Git remote 已包含 SHA、同一分支或本地测试通过都不能代替核验；状态未知或未决时保持阻塞，不重放 push、发布或完成入口。隔离 fixture 只验证入口的失败关闭和参数分流，不是平台安全或实时触发状态证据。
 
