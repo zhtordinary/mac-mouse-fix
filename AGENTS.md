@@ -23,12 +23,12 @@
    - 内部阶段使用绑定项目、分支、App 阶段的 handoff；handoff 不是单独授权，仍须显式 push 授权、固定文件/tree/父 SHA 和独立 App/服务授权。候选提交必须仍由项目入口固定文件、tree、父 SHA 和分支；不要手动提交绕过入口。
    - `--with-app` 不构成构建、安装或 Helper 服务重启的一揽子授权；每项必须分别明确授权。当前 `setup-app.sh` 无条件拒绝，不执行文件或进程操作；恢复须独立可信地验证产物与目标身份、可恢复替换、权限及竞态，不能仅凭旗标放行。
    - `--resume SOURCE_SHA` 须先核验真实外部未决状态；不得从旧回执或同 SHA 推断授权。当前恢复同样阻塞。
-   - 对端同步前核对分支、remote、工作区干净及固定目标提交；离线、脏工作区、无法 fast-forward 或结果未知时交付失败，保留现场并报告阻塞。
+   - 对端同步前核对分支、remote、工作区干净及固定目标提交；逐阶段区分必需设备与可选设备；MacBook Air 当前作为可选设备，离线时不阻断已验证源码的 GitHub 交付（可通过 `--allow-offline-peer` 暂缓对齐，待设备上线后补齐）；脏工作区、无法 fast-forward 或结果未知时保留现场并报告。
    - 修改交付流程后运行 `python3 scripts/test_ai_deliver.py`，用隔离 Git/SSH/build/install/hook 夹具验证本地候选路径、真实 push 入口和恢复入口的边界，以及隔离替身中的候选 tree/父 SHA 防漂移；另运行 `python3 -B Tests/test_setup_app_safety.py`、`python3 -B Tests/test_button_release_routing.py`、`python3 -B Tests/test_keyboard_event_safety.py` 和 `python3 -B Tests/test_personal_use_actions.py`。fixture 只证明本地控制流，不证明真实托管平台安全。
 
 ## 协作流程入口
 
-修改源码、规则、文档、测试或配置前，必须先阅读 [项目协作流程](docs/collaboration.md)。该流程按 `github-repo-ops 2026.11.03.3` 实例化，最新规范对齐 `2026.11.06.2`，详细说明任务 worktree、personal-use 分支、验证、交付和收尾边界。
+修改源码、规则、文档、测试或配置前，必须先阅读 [项目协作流程](docs/collaboration.md)。该流程按 `github-repo-ops 2026.11.03.3` 实例化，最新规范对齐 `2026.11.12.1`，详细说明任务 worktree、personal-use 分支、验证、交付和收尾边界。
 
 **单目标闭环契约（对齐 Reader 规范）：** 任务采用单一目标闭环交付。源码合入 `origin/personal-use` 且两台 Mac 快进对齐后，由发起交付的会话立即在当前轮次内执行收尾清理：在确认任务树干净且无活动依赖时，直接从主 checkout 执行 `git worktree remove`，并用 `git branch -d` 删除已合入分支；杜绝已合入无依赖的任务树作为孤儿工作树长期滞留磁盘。仍需继续执行或明确属于多阶段进行中的任务，才保留现场并在回复中明确标为“部分完成”及剩余事项。会话 cwd、MCP argv 或 SSH ControlMaster 中单独出现任务路径不阻断清理。严禁在交付脚本或发布流程中设置无实现的空验证器硬阻断。
 

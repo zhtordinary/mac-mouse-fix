@@ -43,6 +43,7 @@ MODE='deliver'
 WITH_APP=false
 REQUEST_PUSH_EFFECTS=false
 CONFIRM_EXTERNAL_AUTOMATION=false
+ALLOW_OFFLINE_PEER=false
 SOURCE_ONLY=false
 PROJECT_GUARD=''
 GUARD_HANDOFF=''
@@ -65,6 +66,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --source-only)
       SOURCE_ONLY=true
+      shift
+      ;;
+    --allow-offline-peer)
+      ALLOW_OFFLINE_PEER=true
       shift
       ;;
     --guard-handoff)
@@ -477,7 +482,10 @@ fi
 
 printf -v remote_command 'bash -s -- %q %q %q %q %q' "$OTHER_REPO" "$TARGET_BRANCH" "$ORIGIN_URL" "$FINAL_SHA" "$INSTALL_OTHER"
 echo "==> 3. 同步对端 $OTHER_HOST..."
-ssh -o BatchMode=yes -o ConnectTimeout=15 "$OTHER_HOST" "$remote_command" <<'REMOTE'
+if [[ "$ALLOW_OFFLINE_PEER" == true ]] && ! ssh -o BatchMode=yes -o ConnectTimeout=5 "$OTHER_HOST" "true" 2>/dev/null; then
+  echo "    PEER_PENDING=$OTHER_HOST (对端当前离线，按可选设备跳过对齐，待上线后补齐)"
+else
+  ssh -o BatchMode=yes -o ConnectTimeout=15 "$OTHER_HOST" "$remote_command" <<'REMOTE'
 set -Eeuo pipefail
 repo=$1
 branch=$2
@@ -496,6 +504,7 @@ fi
 [[ "$(git -C "$repo" rev-parse HEAD)" == "$target" && -z "$(git -C "$repo" status --porcelain=v1 --untracked-files=all)" ]] || { echo 'ERROR: 对端未收口' >&2; exit 1; }
 echo "PEER_HEAD=$target"
 REMOTE
+fi
 
 if [[ "$ROLE" == 'macbook-air' && "$WITH_APP" == true ]]; then
   install_local_apps "$LOCAL_REPO"

@@ -23,6 +23,8 @@ class CollaborationContractTests(unittest.TestCase):
         self.assertIn("docs/collaboration.md", agents)
         self.assertIn("github-repo-ops 2026.11.03.3", agents)
         self.assertIn("github-repo-ops 2026.11.03.3", workflow)
+        self.assertIn("2026.11.12.1", agents)
+        self.assertIn("2026.11.12.1", workflow)
         self.assertIn("git@github.com:zhtordinary/mac-mouse-fix.git", workflow)
         self.assertIn("personal-use", workflow)
         self.assertIn("/.worktrees/", ignore)
@@ -65,11 +67,13 @@ class CollaborationContractTests(unittest.TestCase):
             "App 阶段未授权",
             "assert_release_only_descendant",
             "refs/heads/$TARGET_BRANCH",
+            "--allow-offline-peer",
         ):
             self.assertIn(requirement, delivery)
         self.assertNotIn("paths_require_build", delivery)
         self.assertIn("App 安装/重启必须显式提供 --with-app", setup)
         workflow = (ROOT / "docs/collaboration.md").read_text()
+        self.assertIn("区分必需设备与可选设备", workflow)
         self.assertIn("普通 Git push 不是纯本地 Git 操作", workflow)
         self.assertIn("真实外部未决状态", workflow)
         self.assertIn("--confirm-external-automation", workflow)

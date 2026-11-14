@@ -1,6 +1,6 @@
 # Mac Mouse Fix 项目协作流程
 
-本文件是 Mac Mouse Fix 的详细协作契约。根目录 `AGENTS.md` 是入口；修改源码、规则、文档、测试或配置前必须先阅读本文件。本契约按 `github-repo-ops 2026.11.03.3` 实例化，本地开发边界参考 `2026.11.05.2`（`a24a0e07eb75faafac0f824091e705e2aab05bc9`）修订，最新规范对齐 `2026.11.06.2`；项目文件随版本控制，日常不依赖全局 Skill 安装目录。
+本文件是 Mac Mouse Fix 的详细协作契约。根目录 `AGENTS.md` 是入口；修改源码、规则、文档、测试或配置前必须先阅读本文件。本契约按 `github-repo-ops 2026.11.03.3` 实例化，本地开发边界参考 `2026.11.05.2`（`a24a0e07eb75faafac0f824091e705e2aab05bc9`）修订，最新规范对齐 `2026.11.12.1`；项目文件随版本控制，日常不依赖全局 Skill 安装目录。
 
 ## 项目适配结果
 
@@ -14,7 +14,7 @@
 | 允许编辑 | 本任务 worktree；主 checkout 仅在已授权的 Git 对齐或显式 App 阶段由交付入口使用，日常源码修改不写入主 checkout |
 | 定向检查 | 规则/文档/测试/配置改动：`python3 -B Tests/test_collaboration_contract.py`、`python3 -B scripts/test_ai_deliver.py`、`python3 -B Tests/test_personal_use_actions.py`、`python3 -B Tests/test_button_release_routing.py`、`python3 -B Tests/test_setup_app_safety.py`、`python3 -B Tests/test_keyboard_event_safety.py`、`python3 scripts/verify-personal-use-build.py`（适用时） |
 | 最终检查 | `git diff --check`、显式文件清单、`git status --porcelain=v1 --untracked-files=all`、worktree 登记及两棵树的根层扫描 |
-| 交付入口 | `./scripts/ai-deliver.sh` 从独立任务 worktree 发起；固定 `origin`、`personal-use`、单父 SOURCE_SHA 和两端 fast-forward 边界。支持 `--source-only` 纯本地候选准备；普通 `--message` 无 push 授权时创建本地候选并在 `PUSH=blocked` 停止；push 交付必须显式提供 `--with-git-push --confirm-external-automation`（兼容 `--authorize-git-push` 与 `--request-push-effects`） |
+| 交付入口 | `./scripts/ai-deliver.sh` 从独立任务 worktree 发起；固定 `origin`、`personal-use`、单父 SOURCE_SHA 和两端 fast-forward 边界。支持 `--source-only` 纯本地候选准备；普通 `--message` 无 push 授权时创建本地候选并在 `PUSH=blocked` 停止；push 交付必须显式提供 `--with-git-push --confirm-external-automation`（兼容 `--authorize-git-push` 与 `--request-push-effects`）；区分必需设备与可选设备，对端 MacBook Air 离线时可使用 `--allow-offline-peer` 暂缓对齐并完成已验证源码交付 |
 | 规则/文档候选边界 | 普通入口可在任务树内创建本地源码候选；push、merge、land、publish、安装和重启仍是分别授权的后续阶段 |
 | 构建/发布 | 构建、安装和 Helper 服务重启须分别明确授权；`--with-app` 不能一揽子授权。当前入口及安装均硬阻塞 |
 | 任务分支收尾 | 未合入、dirty、活跃引用或归属不明时保留任务 worktree；合入后才按本契约核对并安全收尾，不用 `branch -D` 或批量 prune |
